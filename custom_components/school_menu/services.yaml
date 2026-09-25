@@ -1,16 +1,23 @@
 import_pdf:
   name: Import menu PDF
   description: >-
-    Reads a weekly school-menu PDF from disk and stores the week it contains.
-    The file must live under /config/www or a configured media folder.
+    Reads a weekly school-menu PDF and stores the week it contains. Either from
+    disk (under /config/www or a configured media folder) or from an upload.
   fields:
     file_path:
       name: File path
       description: Absolute path to the PDF, under /config/www or a media folder.
-      required: true
+      required: false
       example: /config/www/menus/AHS Speiseplan 26-40.pdf
       selector:
         text: null
+    file_id:
+      name: Uploaded file
+      description: A PDF uploaded through the UI. Use this or File path, not both.
+      required: false
+      selector:
+        file:
+          accept: application/pdf,.pdf
     week_start:
       name: Week start
       description: >-

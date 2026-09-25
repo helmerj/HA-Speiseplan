@@ -30,18 +30,21 @@ class MenuStore:
         self._rebuild_index()
         return self.index
 
-    async def async_save_week(self, week: ParsedWeek, *, source: str) -> bool:
+    async def async_save_week(
+        self, week: ParsedWeek, *, source: str, keep_provenance: bool = False
+    ) -> bool:
         key = iso_week_key(week.week_start)
         existing = self.weeks.get(key, {})
         hashes: list[str] = list(existing.get("content_hashes", []))
         if week.content_hash not in hashes:
             hashes.append(week.content_hash)
+        reuse = keep_provenance and existing.get("ingested_at") is not None
         self.weeks[key] = {
             "week_start": week.week_start.isoformat(),
-            "source_file": week.source_file,
+            "source_file": existing["source_file"] if reuse else week.source_file,
             "content_hashes": hashes,
-            "ingested_at": dt_util.now().isoformat(),
-            "source": source,
+            "ingested_at": existing["ingested_at"] if reuse else dt_util.now().isoformat(),
+            "source": existing.get("source", source) if reuse else source,
             "days": {day.date.isoformat(): {"lines": list(day.lines)} for day in week.days},
         }
         self._prune()
@@ -75,9 +78,21 @@ class MenuStore:
             stamp = dt_util.parse_datetime(record.get("ingested_at", "") or "")
             if stamp is None:
                 continue
-            if newest_stamp is None or stamp > newest_stamp:
+            if newest_stamp is None or stamp >= newest_stamp:
                 newest, newest_stamp = record, stamp
         return newest
+
+    @property
+    def latest_week_key(self) -> str | None:
+        newest_key: str | None = None
+        newest_stamp: datetime.datetime | None = None
+        for key, record in self.weeks.items():
+            stamp = dt_util.parse_datetime(record.get("ingested_at", "") or "")
+            if stamp is None:
+                continue
+            if newest_stamp is None or stamp >= newest_stamp:
+                newest_key, newest_stamp = key, stamp
+        return newest_key
 
     def record_for_day(self, day: datetime.date) -> dict[str, Any] | None:
         key = self.week_of_day.get(day)

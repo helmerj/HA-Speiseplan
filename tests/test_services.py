@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import datetime
 import shutil
+from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from homeassistant.components import persistent_notification
@@ -222,3 +224,109 @@ async def test_known_bytes_are_skipped_before_any_store_write(
     await _import(hass, path)
 
     assert coordinator.store.weeks["2026-W40"]["ingested_at"] == first_ingest
+
+
+async def test_supplying_neither_source_is_refused(hass: HomeAssistant, loaded_entry) -> None:
+    with pytest.raises(ServiceValidationError) as excinfo:
+        await hass.services.async_call(DOMAIN, SERVICE_IMPORT_PDF, {}, blocking=True)
+    assert excinfo.value.translation_key == "exactly_one_source"
+
+
+async def test_supplying_both_sources_is_refused(hass: HomeAssistant, loaded_entry) -> None:
+    path = _www(hass, "AHS Speiseplan 26-40.pdf")
+
+    with pytest.raises(ServiceValidationError) as excinfo:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_IMPORT_PDF,
+            {"file_path": str(path), "file_id": "abc"},
+            blocking=True,
+        )
+    assert excinfo.value.translation_key == "exactly_one_source"
+
+
+async def test_an_uploaded_file_imports(hass: HomeAssistant, loaded_entry) -> None:
+    upload = _www(hass, "uploaded.pdf", "AHS Speiseplan 26-40.pdf")
+
+    @contextmanager
+    def _fake_process(_hass, _file_id):
+        yield upload
+
+    with patch("homeassistant.components.file_upload.process_uploaded_file", _fake_process):
+        await hass.services.async_call(
+            DOMAIN, SERVICE_IMPORT_PDF, {"file_id": "upload-1"}, blocking=True
+        )
+
+    coordinator = hass.data[DOMAIN][loaded_entry.entry_id]
+    assert coordinator.menu_for(datetime.date(2026, 9, 28)) is not None
+
+
+@pytest.mark.parametrize(
+    ("payload", "reason"),
+    [
+        (b"not a pdf", "no_text_layer"),
+        (b"", "no_text_layer"),
+    ],
+)
+async def test_every_parse_failure_preserves_stored_data(
+    hass: HomeAssistant, loaded_entry, payload: bytes, reason: str
+) -> None:
+    await _import(hass, _www(hass, "AHS Speiseplan 26-40.pdf"))
+    coordinator = hass.data[DOMAIN][loaded_entry.entry_id]
+    before = {key: dict(value) for key, value in coordinator.store.weeks.items()}
+
+    with pytest.raises(HomeAssistantError):
+        await _import(hass, _write_www(hass, "bad.pdf", payload))
+
+    assert coordinator.store.weeks == before
+
+
+@pytest.mark.parametrize(
+    ("payload", "reason"),
+    [
+        (b"not a pdf at all", "no_text_layer"),
+        (b"", "no_text_layer"),
+    ],
+)
+async def test_the_storage_file_is_byte_identical_after_a_failure(
+    hass: HomeAssistant, loaded_entry, payload: bytes, reason: str
+) -> None:
+    await _import(hass, _www(hass, "AHS Speiseplan 26-40.pdf"))
+    storage = Path(hass.config.path(".storage")) / f"school_menu.{loaded_entry.entry_id}"
+    before = storage.read_bytes() if storage.exists() else None
+    coordinator = hass.data[DOMAIN][loaded_entry.entry_id]
+
+    with pytest.raises(HomeAssistantError) as excinfo:
+        await _import(hass, _write_www(hass, "bad.pdf", payload))
+
+    assert reason in str(excinfo.value)
+    after = storage.read_bytes() if storage.exists() else None
+    assert after == before
+    assert coordinator.store.weeks["2026-W40"]["source_file"] == "AHS Speiseplan 26-40.pdf"
+
+
+async def test_a_week_outside_retention_reports_that_it_was_not_stored(
+    hass: HomeAssistant, loaded_entry, freezer
+) -> None:
+    coordinator = hass.data[DOMAIN][loaded_entry.entry_id]
+    for offset in range(4):
+        start = datetime.date(2026, 9, 28) + datetime.timedelta(weeks=offset)
+        freezer.move_to(f"{start.isoformat()} 09:00:00+02:00")
+        await coordinator.async_import_week(_parsed(start, f"h{offset}"), source="manual")
+
+    await _import(hass, _www(hass, "AHS Speiseplan 26-39.pdf"))
+
+    message = _notifications(hass)[NOTIFICATION_OK_ID]["message"]
+    assert "nicht gespeichert" in message
+    assert "2026-W39" not in coordinator.store.weeks
+
+
+def _parsed(start: datetime.date, content_hash: str):
+    from custom_components.school_menu.models import DayMenu, ParsedWeek
+
+    return ParsedWeek(
+        week_start=start,
+        days=(DayMenu(date=start, lines=("Pasta",)),),
+        source_file=f"{start}.pdf",
+        content_hash=content_hash,
+    )

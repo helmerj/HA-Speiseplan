@@ -462,7 +462,16 @@ crosses New Year (`28.12.26 – 01.01.27`) correct for free; `2026-12-28` is `20
 **Rollover:** `async_track_time_change(hass, _at_midnight, hour=0, minute=0, second=0)`, registered in
 `async_setup_entry` and torn down via `entry.async_on_unload`. The callback only calls
 `coordinator.async_update_listeners()` — no IO, no refetch. Wall-clock based, so it survives DST
-transitions and a tz change in HA settings without special handling.
+transitions without special handling: verified against HA's own scheduler across both 2026
+transitions in Europe/Berlin, it fires exactly once per local calendar date (23 h apart in spring,
+25 h in autumn).
+
+**Amendment 2026-09-25 — a timezone change DOES need handling.** v1 of this section claimed the
+rollover also survives a tz change in HA settings "without special handling". That was wrong.
+`_TrackUTCTimeChange` recomputes its schedule only when it fires and registers no core-config
+listener, so after changing the zone both sensors keep the old day until the next (old-zone)
+midnight — up to ~24 h, during which `today` can report a school day as a weekend. The entry
+therefore also listens for `EVENT_CORE_CONFIG_UPDATE` and refreshes the listeners immediately.
 
 **Coordinator shape (§10 R13):** `SchoolMenuCoordinator` subclasses `DataUpdateCoordinator` from M1 with
 `update_interval=None` — no polling in M1, but the listener fan-out, `async_set_updated_data`, and the

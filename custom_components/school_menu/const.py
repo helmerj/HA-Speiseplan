@@ -21,6 +21,9 @@ ATTR_LINES = "lines"
 ATTR_SOURCE_FILE = "source_file"
 ATTR_INGESTED_AT = "ingested_at"
 ATTR_REASON = "reason"
+ATTR_WEEK = "week"
+ATTR_SOURCE = "source"
+ATTR_WEEKS_STORED = "weeks_stored"
 
 GERMAN_WEEKDAYS = (
     "Montag",
@@ -34,7 +37,11 @@ GERMAN_WEEKDAYS = (
 
 SERVICE_IMPORT_PDF = "import_pdf"
 CONF_FILE_PATH = "file_path"
+CONF_FILE_ID = "file_id"
 CONF_WEEK_START = "week_start"
 SOURCE_MANUAL = "manual"
+SENSOR_TODAY = "today"
+SENSOR_TOMORROW = "tomorrow"
+SENSOR_LAST_IMPORT = "last_import"
 NOTIFICATION_ERROR_ID = "school_menu_import_error"
 NOTIFICATION_OK_ID = "school_menu_import_ok"

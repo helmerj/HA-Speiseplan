@@ -32,11 +32,20 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
         incoming = {day.date.isoformat(): list(day.lines) for day in week.days}
         unchanged = (
             existing is not None
-            and {iso: payload["lines"] for iso, payload in existing.get("days", {}).items()}
+            and {
+                iso: list(payload.get("lines", []))
+                for iso, payload in existing.get("days", {}).items()
+            }
             == incoming
         )
 
-        await self.store.async_save_week(week, source=source)
+        stored = await self.store.async_save_week(week, source=source, keep_provenance=unchanged)
+        if not stored:
+            _LOGGER.warning(
+                "Week %s was dropped by retention and is not stored",
+                iso_week_key(week.week_start),
+            )
+            return False
         if unchanged:
             _LOGGER.debug("Week %s unchanged, recording hash only", iso_week_key(week.week_start))
             return False

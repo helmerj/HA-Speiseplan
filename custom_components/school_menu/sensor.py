@@ -3,10 +3,11 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
@@ -19,13 +20,19 @@ from .const import (
     ATTR_MAIN,
     ATTR_REASON,
     ATTR_SIDE,
+    ATTR_SOURCE,
     ATTR_SOURCE_FILE,
+    ATTR_WEEK,
     ATTR_WEEKDAY,
+    ATTR_WEEKS_STORED,
     DOMAIN,
     GERMAN_WEEKDAYS,
     NO_MENU_STATE,
     REASON_NO_MENU,
     REASON_WEEKEND,
+    SENSOR_LAST_IMPORT,
+    SENSOR_TODAY,
+    SENSOR_TOMORROW,
     STATE_MAX_LENGTH,
 )
 from .coordinator import SchoolMenuCoordinator
@@ -36,7 +43,21 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
     coordinator: SchoolMenuCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([SchoolMenuSensor(coordinator, entry, "today")])
+    async_add_entities(
+        [
+            SchoolMenuSensor(coordinator, entry, SENSOR_TODAY),
+            SchoolMenuSensor(coordinator, entry, SENSOR_TOMORROW),
+            LastImportSensor(coordinator, entry),
+        ]
+    )
+
+
+def _device(entry: ConfigEntry) -> DeviceInfo:
+    return DeviceInfo(
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=entry.title,
+        entry_type=DeviceEntryType.SERVICE,
+    )
 
 
 class SchoolMenuSensor(CoordinatorEntity[SchoolMenuCoordinator], SensorEntity):
@@ -48,11 +69,7 @@ class SchoolMenuSensor(CoordinatorEntity[SchoolMenuCoordinator], SensorEntity):
         self._which = which
         self._attr_name = which.capitalize()
         self._attr_unique_id = f"{entry.entry_id}_{which}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.title,
-            entry_type=DeviceEntryType.SERVICE,
-        )
+        self._attr_device_info = _device(entry)
 
     @property
     def _target(self) -> datetime.date | None:
@@ -98,4 +115,33 @@ class SchoolMenuSensor(CoordinatorEntity[SchoolMenuCoordinator], SensorEntity):
         if record is not None:
             attributes[ATTR_SOURCE_FILE] = record.get("source_file")
             attributes[ATTR_INGESTED_AT] = record.get("ingested_at")
+        return attributes
+
+
+class LastImportSensor(CoordinatorEntity[SchoolMenuCoordinator], SensorEntity):
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:clock-check-outline"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: SchoolMenuCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._attr_name = "Last import"
+        self._attr_unique_id = f"{entry.entry_id}_{SENSOR_LAST_IMPORT}"
+        self._attr_device_info = _device(entry)
+
+    @property
+    def native_value(self) -> datetime.datetime | None:
+        return self.coordinator.store.last_import
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        attributes: dict[str, Any] = {
+            ATTR_WEEKS_STORED: len(self.coordinator.store.weeks),
+        }
+        record = self.coordinator.store.latest_record
+        if record is not None:
+            attributes[ATTR_WEEK] = self.coordinator.store.latest_week_key
+            attributes[ATTR_SOURCE_FILE] = record.get("source_file")
+            attributes[ATTR_SOURCE] = record.get("source")
         return attributes

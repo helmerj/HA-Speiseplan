@@ -138,3 +138,21 @@ async def test_a_repeated_hash_is_recorded_only_once(hass: HomeAssistant) -> Non
     await store.async_save_week(_week(datetime.date(2026, 9, 28), content_hash="a"), source="imap")
 
     assert store.weeks["2026-W40"]["content_hashes"] == ["a"]
+
+
+async def test_a_record_with_an_unparseable_timestamp_is_ignored(hass: HomeAssistant) -> None:
+    store = MenuStore(hass, "entry-1")
+    await store.async_load()
+    await store.async_save_week(WEEK_40, source="manual")
+    store.weeks["2026-W41"] = {
+        "week_start": "2026-10-05",
+        "source_file": "corrupt.pdf",
+        "content_hashes": ["x"],
+        "ingested_at": "not a timestamp",
+        "source": "manual",
+        "days": {},
+    }
+
+    assert store.latest_week_key == "2026-W40"
+    assert store.latest_record["source_file"] == "AHS Speiseplan 26-40.pdf"
+    assert store.last_import is not None

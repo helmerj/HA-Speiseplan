@@ -110,3 +110,35 @@ the previous day. `tests/conftest.py` now pins HA to `Europe/Berlin`, which is w
 actually runs in.
 
 Gate: build PASS, tests PASS (110 passed), coverage 97% (target 85), e2e(@m1) PASS, review PASS.
+
+## M2 — Correct every hour, safe on bad input
+
+Ships: the tomorrow sensor, the `last_import` diagnostic sensor, the midnight rollover timer, the
+`file_id` upload path with an exactly-one-of rule, DST/year-boundary coverage, and parse-failure
+data preservation asserted against the `.storage` file itself.
+
+### Review round 1 — `changes_requested` (0 blocker, 5 major, 5 minor, 3 nit)
+
+Full triage in `issues.md`. Three things worth carrying forward:
+
+1. **A live wrong-day defect.** A runtime timezone change left both sensors on the old day for up to
+   24 h — `today` reporting Monday as a weekend — because HA's time-change tracker only reschedules
+   when it fires. Design §6 asserted the opposite; the code now listens for `EVENT_CORE_CONFIG_UPDATE`
+   and **§6 has been amended** to record the real behaviour.
+2. **Three timer mutants shipped green.** Hourly, per-minute and even a per-second midnight pattern
+   all passed the suite, because both rollover tests fired once at `00:00:01` — any schedule that
+   *includes* midnight passed. The e2e now counts fires across 48 h and requires exactly two.
+3. **My own edit tooling produced a false record.** The M1 fix for "prune result reaches the caller"
+   used a plain `str.replace` with no assertion; the pattern did not match, the edit silently did
+   nothing, and `issues.md` recorded the finding as closed. The reviewer caught it as a nit. Every
+   edit script now asserts its pattern matched before writing. **Lesson: an unasserted replace is a
+   silent no-op, and a review record is only as true as the edit under it.**
+
+Also fixed: `last_import` advanced for imports the coordinator had rejected (defeating the R15
+staleness signal it exists to provide), an unknown `file_id` escaped as a raw `ValueError` on the
+ordinary retry path, the upload notification named the ULID instead of the filename, and the only
+upload test faked away both the delete-on-exit guarantee and the executor placement.
+
+Sixteen mutants written across this milestone; all sixteen killed.
+
+Gate: build PASS, tests PASS (144 passed), coverage 99% (target 85), e2e(@m2) PASS, review PASS.

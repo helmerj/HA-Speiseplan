@@ -162,3 +162,48 @@ async def test_a_stored_day_with_no_lines_reports_no_menu(
     state = hass.states.get(TODAY)
     assert state.state == NO_MENU_STATE
     assert state.attributes["reason"] == "no_menu"
+
+
+async def test_last_import_is_a_diagnostic_timestamp_entity(
+    hass: HomeAssistant, config_entry: MockConfigEntry, freezer
+) -> None:
+    from homeassistant.helpers import entity_registry as er
+    from homeassistant.helpers.entity import EntityCategory
+
+    freezer.move_to("2026-09-28 10:00:00+02:00")
+    await _setup_with_week_40(hass, config_entry)
+
+    entry = er.async_get(hass).async_get("sensor.school_menu_last_import")
+    assert entry.entity_category is EntityCategory.DIAGNOSTIC
+    assert hass.states.get("sensor.school_menu_last_import").attributes["device_class"] == (
+        "timestamp"
+    )
+
+
+async def test_an_unchanged_reimport_does_not_move_last_import(
+    hass: HomeAssistant, config_entry: MockConfigEntry, freezer
+) -> None:
+    freezer.move_to("2026-09-28 09:00:00+02:00")
+    await _setup_with_week_40(hass, config_entry)
+    coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    before = coordinator.store.weeks["2026-W40"]["ingested_at"]
+    week = coordinator.store.weeks["2026-W40"]
+
+    freezer.move_to("2026-10-05 09:00:00+02:00")
+    from custom_components.school_menu.models import DayMenu, ParsedWeek
+
+    same_days = tuple(
+        DayMenu(date=datetime.date.fromisoformat(iso), lines=tuple(payload["lines"]))
+        for iso, payload in sorted(week["days"].items())
+    )
+    resaved = ParsedWeek(
+        week_start=datetime.date(2026, 9, 28),
+        days=same_days,
+        source_file="resaved.pdf",
+        content_hash="different-bytes",
+    )
+    assert await coordinator.async_import_week(resaved, source="manual") is False
+
+    assert coordinator.store.weeks["2026-W40"]["ingested_at"] == before
+    assert coordinator.store.weeks["2026-W40"]["source_file"] == "AHS Speiseplan 26-40.pdf"
+    assert coordinator.store.weeks["2026-W40"]["content_hashes"][-1] == "different-bytes"
