@@ -1,0 +1,17 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "School menu",
+        "data": {
+          "name": "Name"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "School menu is already configured. Only one entry is supported.",
+      "already_in_progress": "Another School menu configuration flow is already in progress.",
+      "single_instance_allowed": "Only one School menu entry is supported."
+    }
+  }
+}

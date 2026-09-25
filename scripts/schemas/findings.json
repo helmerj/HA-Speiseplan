@@ -1,0 +1,54 @@
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["done", "no_work", "blocked", "refuted"],
+      "description": "done = you reviewed the range the brief named and the findings below are your whole verdict; blocked = you could not finish (say what stopped you). no_work/refuted exist for the other roles and are read as blocked here."
+    },
+    "message": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "One paragraph for the driver and the next round: what you read, what you probed by execution, what you could not probe. Evidence, not assurance."
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["converged", "open"],
+      "description": "Your verdict on THIS dimension's own findings: converged = no open blocker and no open major below; open = at least one. Minors never decide it. The driver derives the artifact's status line from the findings themselves and reports a disagreement."
+    },
+    "findings": {
+      "type": "array",
+      "description": "Every defect you are raising this round, one entry each. Empty when you found nothing at blocker/major/minor. The driver renders these into review-results/ under stable ids (r<round>-<dimension>-<n>); a finding without a dir/file.ext path is owned by no role and is refused.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": { "type": "string", "enum": ["blocker", "major", "minor"] },
+          "path": { "type": "string", "description": "dir/file.ext of the defect — a PATH, never a class or module name; findings are routed to the role whose write-scope owns the path." },
+          "line": { "type": "integer", "description": "Line number in path, 0 when the finding is about the file as a whole." },
+          "title": { "type": "string", "maxLength": 300, "description": "One line: what is wrong and why it matters." },
+          "evidence_command": { "type": "string", "maxLength": 500, "description": "The command that shows the defect (a failing probe, a grep, a test run). Empty only for a finding you could not reproduce by execution — say so in the title." },
+          "observed_output": { "type": "string", "maxLength": 1000, "description": "What that command printed, trimmed to the lines that matter." }
+        },
+        "required": ["severity", "path", "line", "title", "evidence_command", "observed_output"],
+        "additionalProperties": false
+      }
+    },
+    "verifications": {
+      "type": "array",
+      "description": "Optional. Earlier findings (by their r<round>-<dimension>-<n> id from the brief) you re-checked this round. A closure (resolved or refuted) is applied only when BOTH evidence fields are non-empty; a bare closure is refused and the finding stays open.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "verdict": { "type": "string", "enum": ["resolved", "open", "refuted"] },
+          "evidence_command": { "type": "string", "maxLength": 500 },
+          "observed_output": { "type": "string", "maxLength": 1000 }
+        },
+        "required": ["id", "verdict", "evidence_command", "observed_output"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["status", "message", "verdict", "findings"],
+  "additionalProperties": false
+}

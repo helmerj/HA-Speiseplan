@@ -1,0 +1,56 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # `phacc-latest` is NOT "latest Home Assistant": pytest-homeassistant-custom-component pins
+        # homeassistant==<exact>, so upgrading both resolves HA to whatever that plugin pins. The
+        # honest forward-compat signal is the separate non-blocking `ha-latest` job below.
+        homeassistant: ["pinned", "phacc-latest"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+          if [ "${{ matrix.homeassistant }}" = "phacc-latest" ]; then
+            pip install --upgrade pytest-homeassistant-custom-component
+          fi
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: Test
+        run: pytest -q
+
+  ha-latest:
+    # Forward-compatibility probe against the newest Home Assistant, installed over the plugin's
+    # pin with --no-deps. Non-blocking: it exists to make drift visible, not to gate a PR.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-test.txt
+          pip install --upgrade --no-deps homeassistant
+      - name: Report resolved versions
+        run: pip show homeassistant | head -2
+      - name: Test
+        run: pytest -q -W error::DeprecationWarning

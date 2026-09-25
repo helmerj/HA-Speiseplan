@@ -1,0 +1,21 @@
+name: hacs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
+          # `brands` requires school_menu to be registered in home-assistant/brands, which a new
+          # custom integration is not. Ignored deliberately and recorded, rather than left red.
+          ignore: brands

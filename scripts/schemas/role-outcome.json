@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["done", "no_work", "blocked", "refuted"],
+      "description": "done = you committed the work this brief asked for and journalled it; no_work = nothing in your write-scope needed doing (say why); blocked = you could not finish (say what stopped you); refuted = a [YOURS] finding is WRONG and you have the evidence (quote it). A [YOURS] finding that is already satisfied at HEAD is no_work with the evidence, not refuted: refuted disputes the finding, no_work says the work is done."
+    },
+    "message": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "One paragraph for the NEXT invocation of your role: what you did, what the gate said, what is left. Evidence, not assurance — a command and its output beat a sentence."
+    },
+    "refuted_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Finding ids (or the finding's first words) you refuted, with status refuted."
+    }
+  },
+  "required": ["status", "message"],
+  "additionalProperties": false
+}

@@ -1,0 +1,34 @@
+[project]
+name = "school-menu"
+version = "0.1.0"
+description = "Home Assistant integration exposing the school's weekly lunch menu as sensors"
+requires-python = ">=3.14.2"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "--cov=custom_components/school_menu --cov-report=xml --cov-report=term-missing --cov-fail-under=80"
+markers = [
+    "e2e: black-box acceptance through Home Assistant's public surface",
+    "integration: requires external infrastructure",
+    "m0: milestone 0 acceptance",
+    "m1: milestone 1 acceptance",
+    "m2: milestone 2 acceptance",
+    "m3: milestone 3 acceptance",
+    "m4: milestone 4 acceptance",
+]
+
+[tool.coverage.run]
+source = ["custom_components/school_menu"]
+
+[tool.coverage.report]
+exclude_lines = ["if TYPE_CHECKING:"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+extend-exclude = ["scripts", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC", "ERA", "PGH", "RUF100"]

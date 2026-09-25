@@ -1,0 +1,17 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Speiseplan",
+        "data": {
+          "name": "Name"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Der Speiseplan ist bereits eingerichtet. Nur ein Eintrag wird unterstützt.",
+      "already_in_progress": "Es läuft bereits eine Einrichtung des Speiseplans.",
+      "single_instance_allowed": "Es wird nur ein Speiseplan-Eintrag unterstützt."
+    }
+  }
+}

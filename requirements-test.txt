@@ -1,0 +1,4 @@
+homeassistant==2026.9.3
+pytest-homeassistant-custom-component==0.13.366
+pypdf==6.19.0
+ruff==0.16.9

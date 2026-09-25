@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["done", "no_work", "blocked", "refuted"],
+      "description": "done = every open finding the brief listed has an entry below; blocked = you could not finish (say what stopped you)."
+    },
+    "message": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "One paragraph: what you re-proved by execution, what you could not, and anything the fix commits changed beyond the findings."
+    },
+    "verifications": {
+      "type": "array",
+      "description": "One entry PER OPEN FINDING the brief listed, by its r<round>-<dimension>-<n> id. resolved = the fix commits close it and the command below proves it; open = still there (quote what still shows it); refuted = the finding was wrong (quote the evidence). A closure without BOTH evidence fields is refused by the driver and the finding stays open — a paragraph is not a closure.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "verdict": { "type": "string", "enum": ["resolved", "open", "refuted"] },
+          "evidence_command": { "type": "string", "maxLength": 500, "description": "The command you ran in $REVIEW_WT that shows the verdict." },
+          "observed_output": { "type": "string", "maxLength": 1000, "description": "What it printed, trimmed to the lines that decide it." }
+        },
+        "required": ["id", "verdict", "evidence_command", "observed_output"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["status", "message", "verifications"],
+  "additionalProperties": false
+}

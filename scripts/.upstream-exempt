@@ -1,0 +1,20 @@
+# Declared local harness edits for HA-Speiseplan (school_menu).
+# Format: one entry per line; a PATH freezes that file, a SYMBOL protects only until upstream
+# carries it. `gate_e2e` already exists upstream, so a symbol entry would not protect — hence a path.
+
+# adapters/pytest.sh — gate_e2e rewritten from Playwright to pytest markers.
+# A Home Assistant custom component has no deployable HTTP artifact, so the e2e tier is
+# `pytest -m "e2e and m<n>"`. Upstream's version returns PENDING forever here, which would make
+# every milestone unlandable. UPSTREAM CANDIDATE: teach the stock pytest adapter to fall back to a
+# pytest-marker e2e tier when e2e/playwright.config.ts is absent, and this entry can be deleted.
+adapters/pytest.sh
+
+# Same file, second local fix: gate_build. Stock version (a) ran `compileall -q src` in a repo whose
+# sources are in custom_components/ (compileall exits 0 on a missing dir, so the miss was silent) and
+# (b) used `python3 -m ruff check .`, whose module entry point EXITS 0 while printing "Found N
+# errors" — only the `ruff` executable propagates the status. Together they made gate_build incapable
+# of failing. Proven by injecting an unused import: PASS before, FAIL after. UPSTREAM CANDIDATE.
+
+# loop.config is never overwritten by the installer, so coverage_floor()'s M0 exemption (echo 0) was
+# raised to 80 here rather than exempted: this M0 has real logic (config flow, setup/unload) and a
+# floor of 0 made `coverage(89%) PASS` a statement about nothing.

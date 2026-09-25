@@ -1,0 +1,84 @@
+# knobs.manifest — every knob scripts/loop.config.template declares, with its READER.
+# harness-selfcheck.sh asserts each `script:` reader mentions the knob and each `config:` function is
+# defined; the kitchen's harness-tests.sh asserts every template knob is listed here and every
+# `recipe:` knob appears in SKILL.md. A knob with no reader is decoration, and this harness shipped
+# five of them before anything counted (MUTATION_TARGETS, REVIEW_BUDGET_CRITICAL, REVIEW_DIMENSIONS,
+# COVERAGE_TARGET_PCT, EFFORT_*). An explicit list, not a scanner: the scanner was tried, failed open,
+# and shipped two bugs of its own (LEARNINGS.md, "The knob with no reader").
+STACK                         script:gate.sh
+SPEC_DIR                      script:loop-driver.sh
+E2E_TAG_TICKET_PREFIX         script:gate.sh
+MAIN_SCOPE                    script:lib/roles.sh
+TEST_SCOPE                    script:lib/roles.sh
+REVIEW_SCOPE                  script:lib/roles.sh
+DRIVER_SCOPE                  script:lib/roles.sh
+BOOTSTRAP_SCOPE               script:lib/roles.sh
+REVIEWER_SKILL                recipe:Roles
+SCAFFOLD_SKILL                recipe:Roles
+PROD_SKILL                    recipe:Roles
+TEST_SKILL                    recipe:Roles
+SYNC_JIRA                     recipe:Progress Sync
+SYNC_README                   script:sync-progress.sh
+SYNC_NOTION                   recipe:Progress Sync
+README_PATH                   script:sync-progress.sh
+NOTION_PARENT_ID              recipe:Progress Sync
+SERVICE_NAME                  recipe:Progress Sync
+SYNC_DELIVERABLES             recipe:Deliverables Documentation
+TDD_DOC_ID                    recipe:Deliverables Documentation
+MODEL_DRIVER                  script:loop-driver.sh
+MODEL_TEST_AUTHOR             script:loop-driver.sh
+MODEL_IMPLEMENTER             script:loop-driver.sh
+MODEL_SCAFFOLD                recipe:Model Profile
+MODEL_JIRA_OPS                recipe:Model Profile
+MODEL_REVIEWER                script:loop-driver.sh
+MODEL_REVIEWER_ROUTINE        script:loop-driver.sh
+MODEL_REVIEWER_DELTA          script:loop-driver.sh
+MODEL_VERIFIER                script:loop-driver.sh
+ESCALATION_AGENT              script:loop-driver.sh
+MODEL_SEARCH                  script:loop-driver.sh
+MODEL_ESCALATION_MUTATION     script:loop-driver.sh
+MODEL_ESCALATION_BREAKER      script:loop-driver.sh
+CORRECTNESS_CRITICAL          script:loop-driver.sh
+GRADLE_PERF_ARGS              script:adapters/gradle.sh
+MAVEN_PERF_ARGS               script:adapters/maven.sh
+TESTCONTAINERS_REUSE_ENABLE   script:adapters/gradle.sh
+CHURN_LOC                     script:loop-iteration.sh
+CHURN_FILES                   script:loop-iteration.sh
+STALL_ITERATIONS              script:loop-driver.sh
+REPEAT_FAILURE_LIMIT          script:loop-driver.sh
+REPEAT_CAUSE_LIMIT            script:loop-iteration.sh
+BREAKER_GRADES                script:loop-iteration.sh
+DRIVER_AUTOCOMMIT             script:loop-driver.sh
+DOC_LOC                       script:loop-iteration.sh
+BRIEF_DIFF_MAX                script:loop-driver.sh
+BRIEF_FINDINGS_CAP            script:loop-driver.sh
+MILESTONE_USD_CEILING         script:loop-driver.sh
+TOKEN_BUDGET_DEFAULT          config:token_budget
+SPAWN_USD_CAP                 script:loop-driver.sh
+REVIEW_BUDGET                 script:loop-driver.sh
+REVIEW_OWED_LIMIT             script:loop-driver.sh
+REVIEW_SRC_ONLY_AFTER_ROUND   script:loop-driver.sh
+REVIEW_BUDGET_CRITICAL        config:review_budget
+REVIEW_FALLBACK_COMMITS       script:loop-driver.sh
+REVIEW_DIMENSIONS             script:loop-driver.sh
+REVIEW_VERIFY_MODE            script:loop-driver.sh
+REVIEW_FULL_ROUND_DIFF_LINES  script:loop-driver.sh
+REVIEW_PARALLEL               script:loop-driver.sh
+AREA_RECURRENCE_LIMIT         script:loop-driver.sh
+COVERAGE_FLOOR_PCT            script:gate.sh
+COVERAGE_TARGET_MILESTONES    config:coverage_floor
+MUTATION_TARGETS              script:gate.sh
+IT_PARALLEL_WORKERS           script:adapters/pytest.sh
+EFFORT_TEST_AUTHOR            script:loop-driver.sh
+EFFORT_IMPLEMENTER            script:loop-driver.sh
+EFFORT_REVIEWER               script:loop-driver.sh
+EFFORT_VERIFIER               script:loop-driver.sh
+EFFORT_SCAFFOLD               recipe:Model Profile
+EFFORT_JIRA_OPS               recipe:Model Profile
+EFFORT_SEARCH                 script:loop-driver.sh
+HEARTBEAT_SECS                script:loop-driver.sh
+HARNESS_SHA_CHECK             script:loop-driver.sh
+BASE_BRANCH                   script:loop-driver.sh
+MODEL_IMPLEMENTER_ROUTINE     config:milestone_model
+STEER_MAX_CHARS               script:loop-driver.sh
+SPAWN_POLL_SECS               script:loop-driver.sh

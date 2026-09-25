@@ -1,0 +1,28 @@
+
+# The loop driver's recovery digest — rewritten on every breaker trip, never role output.
+/specs/*/RECOVERY.md
+
+# The loop driver's run logs, briefs and role result JSONs (harness 1.8.9) - never role output.
+/.loop/
+
+# Parallel coverage data files: .coverage.<host>.<pid>.<random>, one per test worker.
+# `.coverage` does not match them. Untracked they are owned by no role, and the harness
+# scope audit reads untracked files — so they trip R6 on whichever role is running.
+.coverage.*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.testmondata
+.coverage
+coverage.xml
+htmlcov/
+
+# Home Assistant test artefacts
+.storage/
+
+# macOS
+.DS_Store
