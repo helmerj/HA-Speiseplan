@@ -13,5 +13,32 @@
       "already_in_progress": "Es läuft bereits eine Einrichtung des Speiseplans.",
       "single_instance_allowed": "Es wird nur ein Speiseplan-Eintrag unterstützt."
     }
+  },
+  "exceptions": {
+    "path_not_allowed": {
+      "message": "{path} liegt außerhalb der erlaubten Ordner. Lege die PDF unter /config/www oder in einen Medienordner."
+    },
+    "file_not_found": {
+      "message": "Keine Datei unter {path}."
+    },
+    "entry_not_loaded": {
+      "message": "Die Speiseplan-Integration ist nicht geladen."
+    }
+  },
+  "services": {
+    "import_pdf": {
+      "name": "Speiseplan-PDF importieren",
+      "description": "Liest eine Wochen-PDF des Speiseplans von der Festplatte und speichert die enthaltene Woche. Die Datei muss unter /config/www oder in einem Medienordner liegen.",
+      "fields": {
+        "file_path": {
+          "name": "Dateipfad",
+          "description": "Absoluter Pfad zur PDF, unter /config/www oder in einem Medienordner."
+        },
+        "week_start": {
+          "name": "Wochenbeginn",
+          "description": "Montag der Woche, die die PDF abdeckt. Wird nur benutzt, wenn die PDF keinen lesbaren Datumsbereich hat."
+        }
+      }
+    }
   }
 }

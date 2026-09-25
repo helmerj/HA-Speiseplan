@@ -1,0 +1,250 @@
+from __future__ import annotations
+
+import datetime
+
+import pytest
+
+from custom_components.school_menu.models import MenuParseError
+from custom_components.school_menu.parser import extract_lines, parse_lines
+
+WEEK_40_LINES = [
+    "WOCHENPLAN",
+    "28.09.26 – 02.10.26",
+    "MONTAG",
+    "Pasta mit Tomaten Sauce dazu Parmesan (1a, 3)",
+    "Blattsalat mit gerösteten Kernen (4)",
+    "Obst",
+    "DIENSTAG",
+    "Kartoffel Gratin (3)",
+    "Rotebeete-Apfel Salat (4)",
+    "Erdbeere Joghurt (3)",
+    "MITTWOCH",
+    "Chili sin Carne mit Sauer Sahne (3)",
+    "Reis",
+    "Blattsalat mit gerösteten Kernen (4)",
+    "DONNERSTAG",
+    "Blumenkohl-Brokkoli-Möhre mit Käse überbacken (3)",
+    "Kartoffeln",
+    "Obst",
+    "FREITAG",
+    "Lauch-Kartoffel Suppe (2)",
+    "Brot (1a)",
+    "Bananen Kuchen (1a)",
+    "„Das Beste in der Musik steht nicht in den Noten.“",
+    "Gustav Mahler",
+    "(Änderung Vorbehalten)",
+    "Allergene und Zusatzstoffe: Gluten (1), Weizen (1a), Dinkel (1b)",
+    "Konservierungsstoff: Natriumnitrit(a)",
+    "Organiced Kitchen Bio Catering 030-32293872 waldorf-charlottenburg@organiced-kitchen.de",
+]
+
+
+def _parse(lines: list[str], **kwargs):
+    return parse_lines(lines, source_file="test.pdf", content_hash="deadbeef", **kwargs)
+
+
+def test_extract_lines_reads_the_real_pdf(week_40_pdf: bytes) -> None:
+    lines = extract_lines(week_40_pdf)
+
+    assert lines[0] == "WOCHENPLAN"
+    assert lines[1] == "28.09.26 – 02.10.26"
+    assert "MONTAG" in lines
+    assert "FREITAG" in lines
+    assert all(line == line.strip() and line for line in lines)
+
+
+def test_extract_lines_rejects_a_pdf_without_a_text_layer() -> None:
+    with pytest.raises(MenuParseError) as excinfo:
+        extract_lines(b"not a pdf at all")
+    assert excinfo.value.reason == "no_text_layer"
+
+
+def test_the_real_week_parses_to_five_days(week_40_pdf: bytes) -> None:
+    week = parse_lines(
+        extract_lines(week_40_pdf), source_file="AHS Speiseplan 26-40.pdf", content_hash="abc"
+    )
+
+    assert week.week_start == datetime.date(2026, 9, 28)
+    assert len(week.days) == 5
+    assert week.days[0].date == datetime.date(2026, 9, 28)
+    assert week.days[0].main == "Pasta mit Tomaten Sauce dazu Parmesan"
+    assert week.days[2].lines == (
+        "Chili sin Carne mit Sauer Sahne",
+        "Reis",
+        "Blattsalat mit gerösteten Kernen",
+    )
+    assert week.days[4].date == datetime.date(2026, 10, 2)
+
+
+def test_both_real_pdfs_carry_no_allergen_codes(week_39_pdf: bytes, week_40_pdf: bytes) -> None:
+    for raw in (week_39_pdf, week_40_pdf):
+        week = parse_lines(extract_lines(raw), source_file="x.pdf", content_hash="h")
+        for day in week.days:
+            for line in day.lines:
+                assert "(" not in line
+
+
+def test_the_footer_never_leaks_into_friday(week_39_pdf: bytes) -> None:
+    week = parse_lines(extract_lines(week_39_pdf), source_file="x.pdf", content_hash="h")
+
+    friday = week.days[4]
+    assert friday.lines == ("Linsen Eintopf", "Brot", "Brownie")
+
+
+def test_a_wrapped_quote_is_still_treated_as_footer() -> None:
+    lines = [*WEEK_40_LINES[:22], "„Der Verstand kann uns sagen, was wir", "sen.“", "Joseph."]
+
+    week = _parse(lines)
+
+    assert week.days[4].lines == ("Lauch-Kartoffel Suppe", "Brot", "Bananen Kuchen")
+
+
+def test_a_day_with_two_lines_has_no_dessert() -> None:
+    lines = [line for line in WEEK_40_LINES if line != "Obst"]
+
+    week = _parse(lines)
+
+    assert week.days[0].lines == (
+        "Pasta mit Tomaten Sauce dazu Parmesan",
+        "Blattsalat mit gerösteten Kernen",
+    )
+    assert week.days[0].dessert is None
+
+
+def test_a_day_with_four_lines_keeps_all_of_them(caplog: pytest.LogCaptureFixture) -> None:
+    lines = list(WEEK_40_LINES)
+    lines.insert(6, "Nachschlag")
+
+    week = _parse(lines)
+
+    assert len(week.days[0].lines) == 4
+    assert week.days[0].main == "Pasta mit Tomaten Sauce dazu Parmesan"
+    assert week.days[0].dessert == "Obst"
+    assert "MONTAG" in caplog.text
+
+
+def test_a_day_anchor_with_no_lines_is_omitted(caplog: pytest.LogCaptureFixture) -> None:
+    lines = [
+        line
+        for line in WEEK_40_LINES
+        if line not in {"Kartoffel Gratin (3)", "Rotebeete-Apfel Salat (4)", "Erdbeere Joghurt (3)"}
+    ]
+
+    week = _parse(lines)
+
+    assert len(week.days) == 4
+    assert datetime.date(2026, 9, 29) not in {day.date for day in week.days}
+    assert "DIENSTAG" in caplog.text
+
+
+def test_a_non_monday_start_date_normalises_to_monday() -> None:
+    lines = list(WEEK_40_LINES)
+    lines[1] = "30.09.26 – 02.10.26"
+
+    week = _parse(lines)
+
+    assert week.week_start == datetime.date(2026, 9, 28)
+
+
+def test_a_missing_header_falls_back_to_the_supplied_week_start() -> None:
+    lines = [line for line in WEEK_40_LINES if line != "28.09.26 – 02.10.26"]
+
+    week = _parse(lines, fallback_week_start=datetime.date(2026, 9, 28))
+
+    assert week.week_start == datetime.date(2026, 9, 28)
+
+
+def test_a_missing_header_with_no_fallback_is_an_error() -> None:
+    lines = [line for line in WEEK_40_LINES if line != "28.09.26 – 02.10.26"]
+
+    with pytest.raises(MenuParseError) as excinfo:
+        _parse(lines)
+    assert excinfo.value.reason == "no_date_range"
+
+
+def test_no_day_anchors_is_an_error() -> None:
+    with pytest.raises(MenuParseError) as excinfo:
+        _parse(["WOCHENPLAN", "28.09.26 – 02.10.26", "Irgendwas"])
+    assert excinfo.value.reason == "no_day_anchors"
+
+
+def test_out_of_order_day_anchors_are_an_error() -> None:
+    lines = ["WOCHENPLAN", "28.09.26 – 02.10.26", "DIENSTAG", "Suppe", "MONTAG", "Pasta"]
+
+    with pytest.raises(MenuParseError) as excinfo:
+        _parse(lines)
+    assert excinfo.value.reason == "day_order"
+
+
+def test_a_week_whose_every_day_is_empty_is_an_error() -> None:
+    lines = ["WOCHENPLAN", "28.09.26 – 02.10.26", "MONTAG", "DIENSTAG", "MITTWOCH"]
+
+    with pytest.raises(MenuParseError) as excinfo:
+        _parse(lines)
+    assert excinfo.value.reason == "no_days_with_content"
+
+
+def test_the_parsed_week_records_its_provenance(week_40_pdf: bytes) -> None:
+    week = parse_lines(extract_lines(week_40_pdf), source_file="AHS.pdf", content_hash="cafe")
+
+    assert week.source_file == "AHS.pdf"
+    assert week.content_hash == "cafe"
+
+
+def test_a_missing_day_anchor_does_not_shift_later_days_onto_it() -> None:
+    lines = [
+        line
+        for line in WEEK_40_LINES
+        if line
+        not in {
+            "MITTWOCH",
+            "Chili sin Carne mit Sauer Sahne (3)",
+            "Reis",
+            "Blattsalat mit gerösteten Kernen (4)",
+        }
+    ]
+
+    week = _parse(lines)
+
+    by_date = {day.date: day for day in week.days}
+    assert datetime.date(2026, 9, 30) not in by_date
+    assert by_date[datetime.date(2026, 10, 1)].main == (
+        "Blumenkohl-Brokkoli-Möhre mit Käse überbacken"
+    )
+    assert by_date[datetime.date(2026, 10, 2)].main == "Lauch-Kartoffel Suppe"
+
+
+@pytest.mark.parametrize(
+    "terminator",
+    [
+        "(Änderung Vorbehalten)",
+        "Allergene und Zusatzstoffe: Gluten (1), Weizen (1a)",
+        "Konservierungsstoff: Natriumnitrit(a)",
+        "Organiced Kitchen Bio Catering www.organiced-kitchen.de",
+    ],
+)
+def test_each_footer_sentinel_stops_friday(terminator: str) -> None:
+    lines = [*WEEK_40_LINES[:22], terminator, "Gustav Mahler", "Noch mehr Fliesstext"]
+
+    week = _parse(lines)
+
+    assert week.days[4].lines == ("Lauch-Kartoffel Suppe", "Brot", "Bananen Kuchen")
+
+
+def test_a_day_is_capped_at_five_lines() -> None:
+    lines = list(WEEK_40_LINES)
+    for extra in ("Zusatz eins", "Zusatz zwei", "Zusatz drei", "Zusatz vier", "Zusatz fuenf"):
+        lines.insert(6, extra)
+
+    week = _parse(lines)
+
+    assert len(week.days[0].lines) == 5
+
+
+def test_an_impossible_header_date_is_ignored() -> None:
+    lines = list(WEEK_40_LINES)
+    lines[1] = "31.02.26 – 02.03.26"
+
+    with pytest.raises(MenuParseError) as excinfo:
+        _parse(lines)
+    assert excinfo.value.reason == "no_date_range"

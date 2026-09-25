@@ -13,5 +13,32 @@
       "already_in_progress": "Another School menu configuration flow is already in progress.",
       "single_instance_allowed": "Only one School menu entry is supported."
     }
+  },
+  "exceptions": {
+    "path_not_allowed": {
+      "message": "{path} is outside the allowed folders. Put the PDF under /config/www or a media folder."
+    },
+    "file_not_found": {
+      "message": "No file at {path}."
+    },
+    "entry_not_loaded": {
+      "message": "The School menu integration is not loaded."
+    }
+  },
+  "services": {
+    "import_pdf": {
+      "name": "Import menu PDF",
+      "description": "Reads a weekly school-menu PDF from disk and stores the week it contains. The file must live under /config/www or a configured media folder.",
+      "fields": {
+        "file_path": {
+          "name": "File path",
+          "description": "Absolute path to the PDF, under /config/www or a media folder."
+        },
+        "week_start": {
+          "name": "Week start",
+          "description": "Monday of the week the PDF covers. Only used when the PDF header has no readable date range."
+        }
+      }
+    }
   }
 }

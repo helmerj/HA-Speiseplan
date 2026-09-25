@@ -474,7 +474,7 @@ transitions and a tz change in HA settings without special handling.
 
 | Situation | Behaviour |
 |---|---|
-| Parse failure (any `MenuParseError`) | **Stored data untouched.** `persistent_notification.async_create` with the reason key, the filename, and the first 200 chars of extracted text. Notification id `school_menu_import_error` so repeats replace rather than pile up. Service raises `HomeAssistantError` so the caller/automation sees it fail. |
+| Parse failure (any `MenuParseError`) | **Stored data untouched.** `persistent_notification.async_create` with the reason key and the filename — **not** the extracted text (amended 2026-09-25, see below). Notification id `school_menu_import_error` so repeats replace rather than pile up. Service raises `HomeAssistantError` so the caller/automation sees it fail. |
 | Path outside allowlist, bad args, entry not loaded | `ServiceValidationError` — shown inline in the UI, no notification, not an integration fault. |
 | **Manual** import success | `persistent_notification` (id `school_menu_import_ok`, replaced on next success) naming the week and day count. |
 | **IMAP** import success | **No notification** (§10 R8). `INFO` log; `sensor.school_menu_last_import` updates. A weekly notification you must dismiss would train you to ignore the failure notifications. |
@@ -484,6 +484,19 @@ transitions and a tz change in HA settings without special handling.
 | Subject/sender no longer matches (silent stop) | **No alarm by design.** `last_import` goes stale and is visible on the card (§10 R15); alarming would false-fire through every Ferien. |
 | IMAP auth failure (M2) | `ConfigEntryAuthFailed` → HA reauth flow. |
 | IMAP transient failure (M2) | `UpdateFailed` → coordinator backs off; notification only after 3 consecutive failures, to avoid nagging on a flaky link. |
+
+**Amendment 2026-09-25 — the notification carries no file content.** v1 of this design said the
+parse-failure notification should include "the first 200 chars of extracted text". It must not. The
+allowlist validates the path, and the file is opened a moment later in the executor; anyone able to
+write into `/config/www` (which Home Assistant also serves unauthenticated at `/local/`) could swap a
+symlink in that window. With a content-free notification that race leaks nothing. Echoing 200
+characters of whatever was actually opened would turn `import_pdf` into a partial arbitrary-read
+oracle. The reason key plus the filename is enough to diagnose a bad PDF; the extracted text goes to
+the debug log, which is not world-readable.
+
+**Amendment 2026-09-25 — `file_path` is `required: true` until M2.** §5.3 specifies exactly-one-of
+`file_path`/`file_id`. `file_id` (the upload path) is M2 work, so M1 ships `file_path` as required.
+The exactly-one-of rule applies once `file_id` exists.
 
 Credentials never appear in logs, notifications, attributes, or diagnostics (`TO_REDACT = {"password", "username"}`).
 

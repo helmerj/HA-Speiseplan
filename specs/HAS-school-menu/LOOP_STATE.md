@@ -55,3 +55,58 @@ Both are generic to the pytest adapter, not to this repo — upstream candidates
 | 10 | minor | Diagnostics test bypassed HA entirely | Now driven through `get_diagnostics_for_config_entry` over the real HTTP endpoint. |
 
 Post-fix: **13 passed, 4 skipped, 98% coverage, `GATE: PASS`.**
+
+## M1 — Manual import → today's lunch
+
+Driven by the driver; test-first per step, single commit per operator instruction (which trades R6's
+*mechanical* RED-before-GREEN proof for a procedural one — noted, not hidden).
+
+| Step | Delivered |
+|---|---|
+| 1 | `extract_lines` (the only pypdf caller) against the real PDF |
+| 2 | `parse_lines` header range: EN/EM/hyphen dashes, `%y`, offsets, non-Monday normalisation |
+| 3 | Day anchors + 5 footer sentinels, name-based day→date mapping |
+| 4 | `cleaning`: allergen groups stripped, `(vegan)`/`(scharf)` preserved, `/` spacing |
+| 5 | `MenuStore`: ISO-week keys, `content_hashes` list, 4-week prune, per-day week lookup |
+| 6 | `SchoolMenuCoordinator` + `sensor.school_menu_today` |
+| 7 | `import_pdf` service with the `/config/www` + media_dirs allowlist |
+| 8 | e2e `@m1` |
+
+**Ground truth correction:** pypdf wraps 26-39's quote across two lines (`„Der Verstand … wir` /
+`sen.“`), which `pdftotext` did not. The `„` sentinel fires on the first line so the continuation is
+never reached — now pinned by `test_a_wrapped_quote_is_still_treated_as_footer`.
+
+**Scope pulled forward from later milestones, deliberately and recorded:** `date_logic.target_date`'s
+`tomorrow` branch (M2) and the three dedup layers (M3). Both were needed to make M1's sensor and
+service coherent. Both now carry their own tests rather than shipping untested.
+
+### Review round 1 — `changes_requested` (0 blocker, 4 major, 6 minor, 2 nit)
+
+Full triage in `issues.md`. The reviewer confirmed **no bypass** of the path allowlist across 15
+attack shapes, but proved the *test* of it was vacuous: deleting `.resolve()` left the whole suite
+green, and `…/www/../secrets.yaml` was admitted because `PurePath` parents still contain `…/www`.
+
+Nine mutants survived the suite at review time. After the fixes, **all nine are killed**:
+
+| Mutant | Before | After |
+|---|---|---|
+| day mapping name-based → positional | survived | KILLED |
+| footer: only the `„` sentinel | survived | KILLED |
+| footer: drop the domain substring | survived | KILLED |
+| remove the 5-line cap | survived | KILLED |
+| `knows_hash` short-circuit disabled | survived | KILLED |
+| `unchanged` branch disabled | survived | KILLED |
+| duplicate-hash guard disabled | survived | KILLED |
+| allowlist: drop `.resolve()` | survived | KILLED |
+| sensor: ignore empty `lines` | survived | KILLED |
+
+Two findings were resolved by **amending `docs/0002-design.md`** rather than the code: the
+parse-failure notification must not echo file content (it would make `import_pdf` a partial
+arbitrary-read oracle through the validate-then-open window), and `file_path` stays `required: true`
+until `file_id` arrives in M2.
+
+**Test-environment fix:** the harness defaults to US/Pacific, so a German wall-clock time landed on
+the previous day. `tests/conftest.py` now pins HA to `Europe/Berlin`, which is what this integration
+actually runs in.
+
+Gate: build PASS, tests PASS (110 passed), coverage 97% (target 85), e2e(@m1) PASS, review PASS.
