@@ -1,12 +1,12 @@
 # School Menu — Home Assistant integration
 
 Turns the weekly lunch-menu PDF from Annie-Heuser-Schule (catered by Organiced Kitchen) into Home
-Assistant sensors, so today's and tomorrow's lunch are on the dashboard with no manual steps.
+Assistant sensors, so today's lunch and the next school day's are on the dashboard with no manual steps.
 
 | Entity | What it reports |
 |---|---|
 | `sensor.school_menu_today` | Today's main course; `none` with `reason: weekend \| no_menu` when there is no lunch |
-| `sensor.school_menu_tomorrow` | The next school day's main course (Fri, Sat and Sun all resolve to Monday) |
+| `sensor.school_menu_next_school_day` | The next school day's main course — Fri, Sat and Sun all resolve to Monday; the `weekday` and `date` attributes say which day it is |
 | `sensor.school_menu_last_import` | Timestamp of the most recent accepted import (diagnostic) |
 
 Each menu sensor also exposes `main`, `side`, `dessert` (positional, not semantic), the full `lines`
@@ -75,10 +75,10 @@ cards:
     tap_action:
       action: more-info
   - type: custom:mushroom-template-card
-    entity: sensor.school_menu_tomorrow
+    entity: sensor.school_menu_next_school_day
     icon: mdi:food-fork-drink
     primary: |-
-      {%- set e = 'sensor.school_menu_tomorrow' -%}
+      {%- set e = 'sensor.school_menu_next_school_day' -%}
       {%- set d = state_attr(e, 'date') -%}
       {%- set label = state_attr(e, 'weekday') ~ ', ' ~ d[8:10] ~ '.' ~ d[5:7] ~ '.' if d else '' -%}
       {%- if not d -%}
@@ -89,7 +89,7 @@ cards:
       {{ label }}
       {%- endif -%}
     secondary: |-
-      {%- set e = 'sensor.school_menu_tomorrow' -%}
+      {%- set e = 'sensor.school_menu_next_school_day' -%}
       {%- set main = state_attr(e, 'main') -%}
       {%- set stand = as_datetime(states('sensor.school_menu_last_import'), None) -%}
       {%- if states(e) in ['unavailable', 'unknown'] -%}

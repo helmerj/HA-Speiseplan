@@ -36,7 +36,9 @@ def iso_week_key(day: datetime.date) -> str:
     return f"{iso.year}-W{iso.week:02d}"
 
 
-def target_date(today: datetime.date, which: Literal["today", "tomorrow"]) -> datetime.date | None:
+def target_date(
+    today: datetime.date, which: Literal["today", "next_school_day"]
+) -> datetime.date | None:
     if which == "today":
         return today if today.weekday() < WEEKDAY_COUNT else None
     ahead = 1

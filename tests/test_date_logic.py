@@ -84,8 +84,8 @@ def test_today_is_none_at_the_weekend(today: datetime.date, expected) -> None:
         (datetime.date(2026, 10, 4), datetime.date(2026, 10, 5)),
     ],
 )
-def test_tomorrow_is_always_the_next_weekday(today: datetime.date, expected) -> None:
-    assert target_date(today, "tomorrow") == expected
+def test_the_next_school_day_is_always_the_next_weekday(today: datetime.date, expected) -> None:
+    assert target_date(today, "next_school_day") == expected
 
 
 @pytest.mark.parametrize(
@@ -100,7 +100,7 @@ def test_tomorrow_is_always_the_next_weekday(today: datetime.date, expected) -> 
 def test_the_next_weekday_around_the_dst_dates_is_pure_date_arithmetic(
     today: datetime.date, expected: datetime.date
 ) -> None:
-    assert target_date(today, "tomorrow") == expected
+    assert target_date(today, "next_school_day") == expected
 
 
 @pytest.mark.parametrize(
@@ -113,4 +113,4 @@ def test_the_next_weekday_around_the_dst_dates_is_pure_date_arithmetic(
 def test_the_next_weekday_across_the_year_boundary(
     today: datetime.date, expected: datetime.date
 ) -> None:
-    assert target_date(today, "tomorrow") == expected
+    assert target_date(today, "next_school_day") == expected

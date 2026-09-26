@@ -207,3 +207,23 @@ async def test_an_unchanged_reimport_does_not_move_last_import(
     assert coordinator.store.weeks["2026-W40"]["ingested_at"] == before
     assert coordinator.store.weeks["2026-W40"]["source_file"] == "AHS Speiseplan 26-40.pdf"
     assert coordinator.store.weeks["2026-W40"]["content_hashes"][-1] == "different-bytes"
+
+
+async def test_the_second_menu_sensor_is_named_for_the_next_school_day(
+    hass: HomeAssistant, config_entry: MockConfigEntry, freezer
+) -> None:
+    from homeassistant.helpers import entity_registry as er
+
+    freezer.move_to("2026-09-26 12:00:00+02:00")
+    await _setup_with_week_40(hass, config_entry)
+
+    registry = er.async_get(hass)
+    entity = registry.async_get("sensor.school_menu_next_school_day")
+    assert entity.unique_id == f"{config_entry.entry_id}_next_school_day"
+    state = hass.states.get("sensor.school_menu_next_school_day")
+    assert state.attributes["friendly_name"] == "School menu Next school day"
+    assert state.attributes["weekday"] == "Montag"
+    assert (
+        registry.async_get_entity_id("sensor", DOMAIN, f"{config_entry.entry_id}_tomorrow") is None
+    )
+    assert hass.states.get("sensor.school_menu_tomorrow") is None

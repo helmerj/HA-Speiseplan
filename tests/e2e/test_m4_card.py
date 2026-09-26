@@ -16,7 +16,7 @@ from tests.conftest import FIXTURES
 pytestmark = [pytest.mark.e2e, pytest.mark.m4]
 
 TODAY = "sensor.school_menu_today"
-TOMORROW = "sensor.school_menu_tomorrow"
+TOMORROW = "sensor.school_menu_next_school_day"
 
 
 def _stage(hass: HomeAssistant) -> Path:

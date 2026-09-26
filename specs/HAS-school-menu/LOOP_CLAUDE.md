@@ -6,7 +6,7 @@ the per-iteration journal belongs in `LOOP_STATE.md`.
 ## Orientation
 
 - **What** — `school_menu`, a Home Assistant custom integration that turns the school's weekly lunch
-  PDF into `sensor.school_menu_today` / `_tomorrow` / `_last_import`.
+  PDF into `sensor.school_menu_today` / `_next_school_day` / `_last_import`.
 - **Specs** — `docs/0001-rfc.md` (approved), `docs/0002-design.md` (v2, the binding technical design),
   `specs/HAS-school-menu/TDD_PLAN.md` (this loop).
 - **Stack** — Python, pytest + `pytest-homeassistant-custom-component`, HA core floor **2026.9.3**,
@@ -17,7 +17,8 @@ the per-iteration journal belongs in `LOOP_STATE.md`.
 
 - No-menu sensor state is the **literal string `none`** with `reason: weekend|no_menu`.
 - **Exactly one config entry**, fixed unique id; `services.yaml` has **no** `config_entry_id`.
-- `tomorrow` is the **next weekday** — Fri, Sat and Sun all resolve to Monday.
+- The second menu sensor is the **next weekday** — Fri, Sat and Sun all resolve to Monday — and is
+  named for it: `sensor.school_menu_next_school_day` (renamed from `_tomorrow` 2026-09-26).
 - Allergen codes are **stripped and discarded**; no `allergens` attribute, no `*_raw`.
 - Parsing is **lenient**: 1–5 lines per day; >3 keeps all and warns; a 0-line day is omitted and warns.
 - Parser has two seams: `extract_lines(bytes)` (only pypdf caller) and `parse_lines(lines)`.

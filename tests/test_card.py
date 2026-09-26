@@ -14,7 +14,7 @@ from custom_components.school_menu.models import DayMenu, ParsedWeek
 from tests.card_render import CARD, card_text, load_card, render_card, template_cards
 
 TODAY = "sensor.school_menu_today"
-TOMORROW = "sensor.school_menu_tomorrow"
+TOMORROW = "sensor.school_menu_next_school_day"
 README = Path(__file__).parents[1] / "README.md"
 WEEK = {
     "2026-09-28": ("Pasta mit Tomaten Sauce dazu Parmesan", "Blattsalat", "Obst"),
@@ -58,7 +58,7 @@ def _readme_blocks() -> list[str]:
     return re.findall(r"```yaml\n(.*?)```", README.read_text(), re.DOTALL)
 
 
-def test_the_card_is_two_mushroom_template_cards_for_today_and_tomorrow() -> None:
+def test_the_card_is_two_mushroom_template_cards_for_today_and_the_next_school_day() -> None:
     tiles = template_cards(load_card())
 
     assert [tile["entity"] for tile in tiles] == [TODAY, TOMORROW]

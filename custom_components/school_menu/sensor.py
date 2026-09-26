@@ -31,12 +31,14 @@ from .const import (
     REASON_NO_MENU,
     REASON_WEEKEND,
     SENSOR_LAST_IMPORT,
+    SENSOR_NEXT_SCHOOL_DAY,
     SENSOR_TODAY,
-    SENSOR_TOMORROW,
     STATE_MAX_LENGTH,
 )
 from .coordinator import SchoolMenuCoordinator
 from .date_logic import target_date
+
+SENSOR_NAMES = {SENSOR_TODAY: "Today", SENSOR_NEXT_SCHOOL_DAY: "Next school day"}
 
 
 async def async_setup_entry(
@@ -46,7 +48,7 @@ async def async_setup_entry(
     async_add_entities(
         [
             SchoolMenuSensor(coordinator, entry, SENSOR_TODAY),
-            SchoolMenuSensor(coordinator, entry, SENSOR_TOMORROW),
+            SchoolMenuSensor(coordinator, entry, SENSOR_NEXT_SCHOOL_DAY),
             LastImportSensor(coordinator, entry),
         ]
     )
@@ -67,7 +69,7 @@ class SchoolMenuSensor(CoordinatorEntity[SchoolMenuCoordinator], SensorEntity):
     def __init__(self, coordinator: SchoolMenuCoordinator, entry: ConfigEntry, which: str) -> None:
         super().__init__(coordinator)
         self._which = which
-        self._attr_name = which.capitalize()
+        self._attr_name = SENSOR_NAMES[which]
         self._attr_unique_id = f"{entry.entry_id}_{which}"
         self._attr_device_info = _device(entry)
 

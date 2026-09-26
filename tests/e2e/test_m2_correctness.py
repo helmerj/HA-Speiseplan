@@ -16,7 +16,7 @@ from tests.conftest import FIXTURES
 pytestmark = [pytest.mark.e2e, pytest.mark.m2]
 
 TODAY = "sensor.school_menu_today"
-TOMORROW = "sensor.school_menu_tomorrow"
+TOMORROW = "sensor.school_menu_next_school_day"
 
 
 def _stage(hass: HomeAssistant, name: str) -> Path:
@@ -48,7 +48,7 @@ async def _import(hass: HomeAssistant, path: Path) -> None:
     await hass.async_block_till_done()
 
 
-async def test_the_weekend_shows_monday_as_tomorrow(
+async def test_the_weekend_shows_monday_as_the_next_school_day(
     hass: HomeAssistant, config_entry: MockConfigEntry, freezer
 ) -> None:
     freezer.move_to("2026-10-03 12:00:00+02:00")

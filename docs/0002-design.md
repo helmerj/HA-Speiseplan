@@ -66,7 +66,7 @@ flowchart TB
         IM["imap_client.py (M2)<br/>SINCE+FROM search, PEEK fetch, sha256"]
         CO["coordinator.py<br/>SchoolMenuCoordinator (DataUpdateCoordinator)"]
         ST["store.py<br/>MenuStore (Store v1, 4-week prune, hash ledger)"]
-        SE["sensor.py<br/>today + tomorrow + last_import"]
+        SE["sensor.py<br/>today + next_school_day + last_import"]
         N["persistent_notification"]
     end
 
@@ -115,7 +115,7 @@ sequenceDiagram
             CO->>ST: upsert by ISO week key, append hash, prune to 4 weeks
             ST-->>CO: saved
             CO->>SE: async_set_updated_data()
-            SE->>SE: recompute today / tomorrow / last_import, write state
+            SE->>SE: recompute today / next_school_day / last_import, write state
             SV->>U: manual import only → persistent_notification "imported, N days"
         else MenuParseError
             PA-->>SV: raise MenuParseError(reason)
@@ -144,7 +144,7 @@ custom_components/school_menu/
 │                        import entry point, dedup decision, listener fan-out. No parsing, no IO.
 ├── config_flow.py       ConfigFlow (M1: single step, single entry enforced) + OptionsFlowWithReload
 │                        (M2: IMAP host/port/user/pass/folder/senders/subject/interval).
-├── sensor.py            SchoolMenuSensor ×2 (today, tomorrow) + LastImportSensor (diagnostic).
+├── sensor.py            SchoolMenuSensor ×2 (today, next_school_day) + LastImportSensor (diagnostic).
 │                        Pure projection of coordinator state; CoordinatorEntity subclasses.
 ├── date_logic.py        Pure. target_date(today, which), weekday naming, week derivation.
 ├── imap_client.py       (M2) aioimaplib client: connect, SINCE+FROM search, BODY.PEEK fetch,
@@ -253,7 +253,7 @@ re-import — impossible in practice, because the IMAP search window is 14 days.
 
 ### 4.3 Sensor state and attributes
 
-| | `sensor.school_menu_today` / `_tomorrow` |
+| | `sensor.school_menu_today` / `_next_school_day` |
 |---|---|
 | state (menu found) | `main` — cleaned first line, e.g. `Pasta mit Tomaten Sauce dazu Parmesan` |
 | state (no menu) | the literal string `none` (§10 R1) |
@@ -385,7 +385,7 @@ Handler contract:
 **M1 config flow** — one step, no connection to test yet:
 `async_step_user` → optional `name` (default `School menu`) → `async_create_entry`.
 A **fixed** unique id plus `_abort_if_unique_id_configured` enforces **exactly one entry, ever**
-(§10 R2). Entity ids therefore stay `sensor.school_menu_today` / `_tomorrow` / `_last_import`, and the
+(§10 R2). Entity ids therefore stay `sensor.school_menu_today` / `_next_school_day` / `_last_import`, and the
 documented card YAML is copy-pasteable with no placeholders.
 
 **M2 options flow** — `OptionsFlowWithReload`, step `init`:
@@ -492,11 +492,13 @@ All "now" comes from `homeassistant.util.dt.now()` (HA-configured tz); the pure 
 argument and never calls `datetime.now()` itself — that is what makes it testable without freezing a clock.
 
 ```python
-def target_date(today: datetime.date, which: Literal["today", "tomorrow"]) -> datetime.date | None
+def target_date(
+    today: datetime.date, which: Literal["today", "next_school_day"]
+) -> datetime.date | None
 ```
 
 - `today`: returns `today` if Mon–Fri, else `None` → state `none`, `reason: weekend`.
-- `tomorrow`: returns the **next weekday strictly after `today`** (§10 R3).
+- `next_school_day`: returns the **next weekday strictly after `today`** (§10 R3).
   Mon–Thu → `+1`; **Fri → Monday (+3); Sat → Monday (+2); Sun → Monday (+1)**.
   The sensor is therefore never `none` for calendar reasons — only when data is genuinely missing.
   The `date` and `weekday` attributes disambiguate, and the card shows them.
@@ -631,7 +633,7 @@ carries the short day label:
 | Tile | `primary` (one line) | `secondary` (wraps) |
 |---|---|---|
 | today | `Heute · <Wochentag>, <TT.MM.>` | main, then every further line joined by ` · ` — or `Kein Mittagessen` |
-| tomorrow | `Morgen · <Wochentag>, <TT.MM.>` when that day is the next calendar day, else `<Wochentag>, <TT.MM.>` (Fri–Sun → Monday, §10 R3) | main — or `Kein Mittagessen` — then `Stand: <TT.MM.>` |
+| next school day | `Morgen · <Wochentag>, <TT.MM.>` when that day is the next calendar day, else `<Wochentag>, <TT.MM.>` (Fri–Sun → Monday, §10 R3) | main — or `Kein Mittagessen` — then `Stand: <TT.MM.>` |
 
 `Kein Mittagessen` means *the integration is running and there is no lunch* (weekend, holiday, no
 menu). When a menu sensor is `unavailable`/`unknown` — the integration is not loaded — the tile says
@@ -646,7 +648,7 @@ All 15 branches closed. These are binding; §§1–9 above already reflect them.
 |---|---|---|---|
 | R1 | No-menu sensor state | Literal string `none` (your brief over the HA `unknown` idiom), `reason: weekend\|no_menu` | §4.3 |
 | R2 | Config entry count | Exactly one, enforced by fixed unique id; `config_entry_id` removed from the service | §5.3, §5.4 |
-| R3 | `tomorrow` on Fri/Sat/Sun | Next weekday — all three resolve to Monday | §6 |
+| R3 | `tomorrow` on Fri/Sat/Sun | Next weekday — all three resolve to Monday. **Amended 2026-09-26:** the sensor is named for what it is — `sensor.school_menu_next_school_day` ("Next school day"), not `_tomorrow` | §6 |
 | R4 | Store retention | Newest 4 weeks by `week_start`, unchanged; safe because ≤1 future week is ever in flight | §4.2 |
 | R5 | IMAP selection | `SINCE today-14d` + `FROM <sender>`, `BODY.PEEK[]`, `\Seen` never set | §5.5 |
 | R6 | Day with 4–5 lines | Keep all in `lines`, `WARNING` log, no wrap-merge heuristic | §5.1 step 5 |
@@ -668,3 +670,13 @@ the subject additionally serves as a `fallback_week_start` source and as a cross
 header, with the header authoritative.
 
 **Nothing is open.** Phase 3 (M1) can start on approval.
+
+**Amendment 2026-09-26 — `tomorrow` renamed to `next_school_day` (R3).** First contact with a live
+instance on a Saturday: the entities card showed "Tomorrow: Pasta …" while tomorrow was Sunday. R3's
+behaviour (Fri/Sat/Sun → Monday) is kept by the operator's decision; the *name* was the defect. The
+sensor is now `sensor.school_menu_next_school_day`, friendly name "Next school day", unique id
+`<entry_id>_next_school_day`, and `date_logic.target_date` takes `"next_school_day"`. The card's
+"Morgen · …" label already appears only when that day is the next calendar day. Entries created
+before the rename keep an orphaned `sensor.school_menu_tomorrow` in the registry, to be removed by
+hand — acceptable pre-release, with one known test install.
+

@@ -18,7 +18,7 @@ pytestmark = [pytest.mark.e2e, pytest.mark.m3]
 
 WATCHED = (
     "sensor.school_menu_today",
-    "sensor.school_menu_tomorrow",
+    "sensor.school_menu_next_school_day",
     "sensor.school_menu_last_import",
 )
 
@@ -94,7 +94,7 @@ async def test_the_weekly_mail_updates_the_sensors_once_and_the_second_copy_chan
         assert today.state == "Chili sin Carne mit Sauer Sahne"
         assert today.attributes["side"] == "Reis"
         assert today.attributes["source_file"] == "AHS Speiseplan 26-40.pdf"
-        assert hass.states.get("sensor.school_menu_tomorrow").state == (
+        assert hass.states.get("sensor.school_menu_next_school_day").state == (
             "Blumenkohl-Brokkoli-Möhre mit Käse überbacken"
         )
         stamp = hass.states.get("sensor.school_menu_last_import").state
@@ -102,7 +102,7 @@ async def test_the_weekly_mail_updates_the_sensors_once_and_the_second_copy_chan
         await _poll_cycle()
 
     assert len(changes["sensor.school_menu_today"]) == 1, changes
-    assert len(changes["sensor.school_menu_tomorrow"]) == 1, changes
+    assert len(changes["sensor.school_menu_next_school_day"]) == 1, changes
     assert len(changes["sensor.school_menu_last_import"]) == 1, changes
     assert hass.states.get("sensor.school_menu_last_import").state == stamp
     assert hass.states.get("sensor.school_menu_last_import").attributes["source"] == "imap"
