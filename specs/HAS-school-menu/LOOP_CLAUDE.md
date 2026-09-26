@@ -34,17 +34,17 @@ Full rationale: `docs/0002-design.md` §10 (R1–R15). If implementation needs t
 
 ## Current state
 
-M0–M3 committed and green. M3: 220 tests, coverage 98%, 23/23 mutants killed, review approved in
-round 2. Gates need the venv on PATH: `PATH="$PWD/.venv/bin:$PATH" scripts/gate.sh M<n>`.
+M0–M4 committed and green — every milestone in TDD_PLAN §4 is done. M4: 246 tests, coverage 98%,
+review approved in round 2. Gates need the venv on PATH: `PATH="$PWD/.venv/bin:$PATH" scripts/gate.sh M<n>`.
 
 ## Next steps
 
-1. M4 — Mushroom card YAML (`cards/mushroom-today-tomorrow.yaml`) rendered through HA's `Template`
-   against live sensor states, per TDD_PLAN §5 M4. The Sunday e2e uses Sun 2026-09-27 so that
-   "tomorrow" (Mon 09-28) lies inside `26-40.pdf`.
+1. Operator: look at the card at 400 px in a real dashboard (not verifiable offline).
+2. Not started: repository push / PR, and the optional Lit card (RFC D4), which is outside this loop.
 
 ## Learnings
 
 - `freezer` also freezes the event-loop clock: a test relying on `asyncio.timeout` must not use it.
 - Coordinator listener fan-out is invisible in state-change events (identical writes are dropped);
   count `async_add_listener` callbacks to test "no listener update".
+- A byte-for-byte artefact test (README == card) kills every mutant; deselect it for mutation runs.

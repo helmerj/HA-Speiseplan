@@ -183,3 +183,26 @@ Twenty-three mutants written across this milestone; all twenty-three killed.
 
 Gate: build PASS, tests PASS (220 passed), coverage 98% (target 85), e2e(@m3) PASS, review PASS.
 
+## M4 — It's on the dashboard
+
+Ships: `cards/mushroom-today-tomorrow.yaml`, embedded verbatim in the README (a test enforces the two
+stay identical), plus README sections for the mailbox and the card. The Lit card stays out of scope.
+
+TDD: 17 RED tests written first against a card that did not exist; GREEN on the first card draft
+except the README. Driver mutation on that draft exposed a vacuous kill: the README-equals-card test
+fails on *any* card edit, so every mutant "died" until it was deselected. **Learning:** when one test
+pins an artefact byte-for-byte, deselect it for mutation runs or the kill count means nothing.
+
+### Review round 1 — `changes_requested` (0 blocker, 1 major, 9 minor, 5 nit)
+
+The major was layout, not logic: Mushroom's `primary` is one ellipsised line, so the main moved into
+the wrapping `secondary` and `primary` became the day label. Design §9 amended first. Eight of the
+reviewer's eleven mutants had survived because assertions were substring checks — all now exact.
+The harness also rendered non-strict; it now uses `async_render_to_info(strict=True)`, Mushroom's path.
+
+### Review round 2 — `approved`
+
+One README wording error closed; two nits accepted (see `issues.md`). Not verifiable offline: the
+card rendered in a real Lovelace frontend at 400 px.
+
+Gate: build PASS, tests PASS (246 passed), coverage 98% (target 85), e2e(@m4) PASS, review PASS.

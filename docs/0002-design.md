@@ -622,6 +622,22 @@ string list passed to `parse_lines`, so the cases are readable and diffable in t
   a small "Stand: …" line; theme variables only, so light/dark follow the active theme; readable at 400 px;
   weekend/empty shows **"Kein Mittagessen"** (§10 R10).
 
+**Amendment 2026-09-26 — card layout (M4 review).** Mushroom's template card renders `primary` on one
+line and truncates it with an ellipsis; only `secondary` wraps (`multiline_secondary`). A 46-character
+main such as "Blumenkohl-Brokkoli-Möhre mit Käse überbacken" does not fit in a 400 px tile's primary,
+so "prominent main" is realised as **the first line of the wrapping `secondary`**, and `primary`
+carries the short day label:
+
+| Tile | `primary` (one line) | `secondary` (wraps) |
+|---|---|---|
+| today | `Heute · <Wochentag>, <TT.MM.>` | main, then every further line joined by ` · ` — or `Kein Mittagessen` |
+| tomorrow | `Morgen · <Wochentag>, <TT.MM.>` when that day is the next calendar day, else `<Wochentag>, <TT.MM.>` (Fri–Sun → Monday, §10 R3) | main — or `Kein Mittagessen` — then `Stand: <TT.MM.>` |
+
+`Kein Mittagessen` means *the integration is running and there is no lunch* (weekend, holiday, no
+menu). When a menu sensor is `unavailable`/`unknown` — the integration is not loaded — the tile says
+`Speiseplan nicht verfügbar` instead, and no `Stand:` line is claimed. The documented card is tested
+through `Template.async_render_to_info(strict=True)`, the path the `render_template` websocket uses.
+
 ## 10. Resolved decisions — design grilling, 2026-09-25
 
 All 15 branches closed. These are binding; §§1–9 above already reflect them.
