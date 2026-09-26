@@ -26,6 +26,7 @@ from .const import (
     SOURCE_MANUAL,
 )
 from .coordinator import SchoolMenuCoordinator
+from .imap_client import create_client
 from .models import MenuParseError, ParsedWeek
 from .parser import extract_lines, parse_lines
 
@@ -164,9 +165,17 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
+_imap_client_factory = create_client
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = SchoolMenuCoordinator(hass, entry)
+    coordinator.client_factory = _imap_client_factory
     await coordinator.async_initialise()
+    if coordinator.update_interval is not None:
+        entry.async_create_background_task(
+            hass, coordinator.async_refresh(), f"{DOMAIN}_first_poll"
+        )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

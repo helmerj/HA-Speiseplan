@@ -6,12 +6,19 @@
         "data": {
           "name": "Name"
         }
+      },
+      "reauth_confirm": {
+        "title": "Passwort des Postfachs erneut eingeben",
+        "data": {
+          "password": "Passwort"
+        }
       }
     },
     "abort": {
       "already_configured": "Der Speiseplan ist bereits eingerichtet. Nur ein Eintrag wird unterstützt.",
       "already_in_progress": "Es läuft bereits eine Einrichtung des Speiseplans.",
-      "single_instance_allowed": "Es wird nur ein Speiseplan-Eintrag unterstützt."
+      "single_instance_allowed": "Es wird nur ein Speiseplan-Eintrag unterstützt.",
+      "reauth_successful": "Passwort aktualisiert."
     }
   },
   "exceptions": {
@@ -49,6 +56,31 @@
           "description": "Montag der Woche, die die PDF abdeckt. Wird nur benutzt, wenn die PDF keinen lesbaren Datumsbereich hat."
         }
       }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Mailbox",
+        "data": {
+          "host": "Server",
+          "port": "Port",
+          "ssl": "SSL verwenden",
+          "username": "Benutzername",
+          "password": "Passwort",
+          "folder": "Ordner",
+          "senders": "Absenderadressen",
+          "subject_filter": "Betreff enthält",
+          "scan_interval_minutes": "Abrufintervall (Minuten)"
+        }
+      }
+    },
+    "error": {
+      "no_senders": "Gib mindestens eine Absenderadresse an.",
+      "no_password": "Gib das Passwort des Postfachs ein.",
+      "no_host": "Gib den Namen des IMAP-Servers ein.",
+      "invalid_sender": "Jeder Absender muss eine einzelne E-Mail-Adresse sein.",
+      "no_subject_filter": "Gib einen Betreff-Filter an; ein leerer Filter würde jede Mail treffen."
     }
   }
 }

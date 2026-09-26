@@ -142,3 +142,44 @@ upload test faked away both the delete-on-exit guarantee and the executor placem
 Sixteen mutants written across this milestone; all sixteen killed.
 
 Gate: build PASS, tests PASS (144 passed), coverage 99% (target 85), e2e(@m2) PASS, review PASS.
+
+## M3 — Email ingestion with two senders
+
+Ships: the mailbox options flow (credentials in `entry.data`), a read-only IMAP poll
+(`EXAMINE`, `BODY.PEEK`, header-first), the three-layer dedup, the subject-KW fallback and cross-check,
+reauth on a bad password, and a failure notification after three consecutive transient failures.
+
+**Inherited state.** The session found M3 half-built and uncommitted, with the gate red: the session
+teardown was `finally: pass`, so a unit test failed and the real-socket suite hung forever in
+`Server.wait_closed()`. The mailbox was also opened with `SELECT`, whose `CLOSE` expunges `\Deleted`
+mail. Both are fixed before review; aioimaplib 2.0.1's `examine()` does not enter `SELECTED`, hence
+`ReadOnlyIMAP4`.
+
+### Review round 1 — `changes_requested` (0 blocker, 8 major, 12 minor, 4 nit)
+
+Full triage in `issues.md`. Worth carrying forward:
+
+1. **Dedup "no listener update" was false in production.** `DataUpdateCoordinator.always_update`
+   defaults to True, so every duplicate-only poll fanned out to listeners. Only visible by counting
+   listener calls; state-change events hide it because HA drops identical state writes.
+2. **Per-sender fetch order let a stale forward overwrite a correction.** Fixed by ascending numeric
+   UID order — and a string sort would pass every single-digit test, so one case uses 998/1002/1003.
+3. **One malformed PDF silently blocked ingestion for the 14-day window**, because pypdf raises far
+   more than `PdfReadError`. `extract_lines` is the pypdf seam, so it maps *any* exception.
+4. **Operator decision (2026-09-26): the shrink guard stays for IMAP, manual wins.** Recorded in
+   design §5.5.
+
+### Review round 2 — `approved` (0 blocker, 0 major, 4 minor, 2 nit)
+
+The four minors were surviving mutants (string UID sort, no `disconnect`, no teardown cap, no poll
+deadline) — all closed with tests. **Learning:** `freezer` freezes the event loop's clock too, so a
+test that relies on `asyncio.timeout` must not request it, or it hangs instead of failing.
+
+Design amended first, per the standing rule: §5.4 (plain `OptionsFlow` + explicit reload, validation),
+§5.5 (session shape, order, download volume, listener updates, shrink guard), §7 (IMAP parse failures,
+notification dismissal).
+
+Twenty-three mutants written across this milestone; all twenty-three killed.
+
+Gate: build PASS, tests PASS (220 passed), coverage 98% (target 85), e2e(@m3) PASS, review PASS.
+

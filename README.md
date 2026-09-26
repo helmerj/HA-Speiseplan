@@ -33,10 +33,10 @@ Under active development, milestone by milestone:
 | Milestone | Ships | State |
 |---|---|---|
 | M0 | Walking skeleton: installs, sets up, unloads; CI green | done |
-| M1 | Import a PDF by hand → today's lunch on a sensor | next |
-| M2 | Correct at every hour incl. weekends; corrupt PDF never destroys stored data | planned |
-| M3 | Weekly email ingestion with two senders and deduplication | planned |
-| M4 | Documented Mushroom dashboard card | planned |
+| M1 | Import a PDF by hand → today's lunch on a sensor | done |
+| M2 | Correct at every hour incl. weekends; corrupt PDF never destroys stored data | done |
+| M3 | Weekly email ingestion with two senders and deduplication | done |
+| M4 | Documented Mushroom dashboard card | next |
 
 ## Documentation
 

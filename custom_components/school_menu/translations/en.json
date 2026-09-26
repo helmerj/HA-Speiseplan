@@ -6,12 +6,19 @@
         "data": {
           "name": "Name"
         }
+      },
+      "reauth_confirm": {
+        "title": "Re-enter the mailbox password",
+        "data": {
+          "password": "Password"
+        }
       }
     },
     "abort": {
       "already_configured": "School menu is already configured. Only one entry is supported.",
       "already_in_progress": "Another School menu configuration flow is already in progress.",
-      "single_instance_allowed": "Only one School menu entry is supported."
+      "single_instance_allowed": "Only one School menu entry is supported.",
+      "reauth_successful": "Password updated."
     }
   },
   "exceptions": {
@@ -49,6 +56,31 @@
           "description": "Monday of the week the PDF covers. Only used when the PDF header has no readable date range."
         }
       }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Mailbox",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "ssl": "Use SSL",
+          "username": "Username",
+          "password": "Password",
+          "folder": "Folder",
+          "senders": "Sender addresses",
+          "subject_filter": "Subject contains",
+          "scan_interval_minutes": "Scan interval (minutes)"
+        }
+      }
+    },
+    "error": {
+      "no_senders": "Add at least one sender address.",
+      "no_password": "Enter the mailbox password.",
+      "no_host": "Enter the IMAP server host name.",
+      "invalid_sender": "Every sender must be a single e-mail address.",
+      "no_subject_filter": "Enter a subject filter; an empty filter would match every mail."
     }
   }
 }

@@ -24,12 +24,11 @@ TYPICAL_LINES_PER_DAY = 3
 
 def extract_lines(pdf_bytes: bytes) -> list[str]:
     from pypdf import PdfReader
-    from pypdf.errors import PdfReadError
 
     try:
         reader = PdfReader(BytesIO(pdf_bytes))
         text = "\n".join(page.extract_text() or "" for page in reader.pages)
-    except (PdfReadError, OSError, ValueError) as err:
+    except Exception as err:
         raise MenuParseError("no_text_layer", detail=str(err)) from err
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     if not lines:

@@ -1,67 +1,66 @@
-# Review — M2 (round 1)
+# Review — M3 (rounds 1–2)
 
 status: converged
 
-Loop: HAS-school-menu · Milestone: M2 · Reviewer: python-services:review-agent (opus, cold, report mode)
-Round 1 verdict as delivered: `changes_requested` — 0 blocker, 5 major, 5 minor, 3 nit.
-All major and minor findings resolved; every fix re-proven by executing a mutant, not by inspection.
-(The M1 record this file previously held is summarised in specs/HAS-school-menu/LOOP_STATE.md.)
+Loop: HAS-school-menu · Milestone: M3 · Reviewer: python-services:review-agent (cold, report mode)
+Round 1: `changes_requested` — 0 blocker, 8 major, 12 minor, 4 nit.
+Round 2: `approved` — 0 blocker, 0 major, 4 minor (test gaps), 2 nit. All four minors then closed.
+Every fix is re-proven by an executed mutant: 23 written this milestone, 23 killed.
+(The M2 record this file previously held is summarised in specs/HAS-school-menu/LOOP_STATE.md.)
 
-## Closed this round
+## Found before review (the working tree as inherited)
 
-- [x] [major] `__init__.py:167` — the rollover's once-per-day cadence was unpinned: hourly, per-minute
-      and **per-second** timer patterns all passed the 128-test suite. → resolved: the `@m2` e2e now
-      fires on a 15-minute grid across a 48 h window and asserts the callback ran **exactly twice**.
-      Re-proven: mutants "hourly" and "every minute" both **KILLED**.
-- [x] [major] `tests/test_date_logic.py:91` — the test named for DST passed bare `date` values to a
-      pure function, touching no clock and no timezone, and every weekday in it was already covered.
-      → resolved: renamed to say what it actually does, and three clock-level `@m2` tests added that
-      fire the real timer across spring-forward and fall-back in Europe/Berlin and assert the
-      displayed date advances by exactly one day.
-- [x] [major] `__init__.py:163` — **a runtime timezone change left both sensors on the wrong day for
-      up to 24 h**, reporting Monday as a weekend. `_TrackUTCTimeChange` only reschedules when it
-      fires and registers no core-config listener. Design §6 claimed the opposite. → resolved: the
-      entry now listens for `EVENT_CORE_CONFIG_UPDATE` and refreshes immediately. Re-proven: mutant
-      "tz listener removed" **KILLED**.
-- [x] [major] `__init__.py:63` — an unknown or already-consumed `file_id` escaped as a bare
-      `ValueError` traceback. Uploads are deleted on first use, so this is the ordinary retry path.
-      → resolved: raised as `ServiceValidationError` with an `upload_not_found` key in all three
-      translation files. Re-proven: mutant "unknown id escapes as ValueError" **KILLED**.
-- [x] [major] `tests/test_services.py:246` — the only upload test faked `process_uploaded_file`
-      entirely, so neither the delete-on-exit guarantee nor the executor placement was pinned.
-      → resolved: `tests/test_upload.py` builds a real `FileUploadData` and asserts the week imported,
-      the upload directory is gone, and a second call fails cleanly. Re-proven: mutants "skip the
-      context manager teardown" and "parse on the event loop" both **KILLED**.
-- [x] [minor] the upload failure notification named the ULID instead of the filename. → resolved: the
-      filename is captured inside the context manager before the parse can fail.
-- [x] [minor] `last_import`'s `device_class: timestamp` and `entity_category: diagnostic` were both
-      deletable with the suite green. → resolved: asserted via the entity registry and state
-      attributes. Both mutants **KILLED**.
-- [x] [minor] **`last_import` advanced for an import the coordinator rejected** — the store
-      overwrote `ingested_at`/`source_file` on the unchanged branch, so the staleness signal R15
-      exists to protect silently reset at the next midnight. → resolved: `async_save_week` takes
-      `keep_provenance` and the coordinator passes it. Mutant **KILLED**.
-- [x] [minor] `test_every_parse_failure_preserves_stored_data` never used its `reason` parameter and
-      compared the in-memory dict, not the gate's stated `.storage`. → resolved: the reason is now
-      asserted and the `.storage` file bytes are compared before and after.
-- [x] [minor] `file_id` was missing from the service field translations and the service description
-      still said "from disk". → resolved in `services.yaml` and all three translation files.
-- [x] [nit] **the prune return value never reached the caller**, so a backfill outside the retention
-      window reported success and the not-stored notification branch was dead. `issues.md` recorded
-      this closed in M1; it was not. Root cause: an edit script used a plain `str.replace` with no
-      assertion, so a non-matching pattern was a silent no-op. → resolved: `async_import_week`
-      rewritten explicitly, with a service-level test for the notification. Mutant **KILLED**.
-      Process fix: every subsequent edit script asserts its pattern matched.
-- [x] [nit] `>` tie-break on equal `ingested_at` favoured the oldest record — reachable under a frozen
-      clock, which is exactly how the M3 dedup tests will run. → resolved: `>=` in all three readers.
-- [x] [nit] `latest_week_key`'s unparseable-timestamp `continue` was uncovered. → resolved.
+- [x] [blocker] `imap_client.py` — `async_fetch_candidates` ended in `finally: pass`: the session
+      was never closed. `test_the_session_is_always_closed` failed and the real-socket suite hung
+      forever in `Server.wait_closed()`. → teardown now runs in the `finally`.
+- [x] [major] the mailbox was opened with `SELECT`; `CLOSE` after a read-write `SELECT` expunges
+      `\Deleted` messages — a mailbox mutation R5 forbids. → `EXAMINE`. aioimaplib 2.0.1's
+      `examine()` never enters `SELECTED`, so `ReadOnlyIMAP4`/`ReadOnlyIMAP4SSL` fix the transition.
 
-## Verified sound by the reviewer — recorded so M3 does not redo it
+## Closed — round 1
 
-- **DST scheduling is correct.** HA's `find_next_time_expression_time` was replayed across both 2026
-  transitions in Europe/Berlin: exactly one fire per local calendar date, 23 h apart in spring, 25 h
-  in autumn. No skip, no double.
-- **`file_id` cannot escape the upload area** — `process_uploaded_file` resolves only ids registered
-  by the upload view; a traversal string is simply absent from the dict.
-- **`last_import` never reports a pruned week** (verified with a 5-import backfill sequence).
-- **Exactly-one-of holds against empty strings** for both `file_path` and `file_id`.
+- [x] [major] `coordinator.py` — every poll notified listeners, even for pure duplicates (HA's
+      `always_update` defaults to True). → `always_update=False`. Mutant **KILLED**.
+- [x] [major] `imap_client.py` — UIDs processed in per-sender order let teacher B's stale forward
+      overwrite teacher A's later correction. → ascending numeric UID order. Mutants "reversed" and
+      "string sort" **KILLED** (the latter needs UIDs 998/1002/1003).
+- [x] [major] one malformed PDF (pypdf `KeyError`, `LimitReachedError`, …) aborted the whole poll
+      for 14 days, silently. → `extract_lines` maps any exception to `MenuParseError`; rejection is
+      per attachment, notified once, hash remembered. Mutants **KILLED**.
+- [x] [major] an undocumented "refuse a week with fewer days" rule. → **operator decision
+      2026-09-26:** kept for IMAP only, refusal notified once and remembered; a manual import always
+      overwrites. Design §5.5 amended. Mutants "guard for manual too" and "guard removed" **KILLED**.
+- [x] [major] `ssl.create_default_context()` on the event loop every poll. →
+      `homeassistant.util.ssl.client_context()`; factory now unit-tested.
+- [x] [major] every poll re-downloaded 14 days of mail in full. → header-first fetch, then an
+      in-memory `(UIDVALIDITY, UID)` cache, keyed only after ingest. Four mutants **KILLED**.
+- [x] [major] the `@m3` e2e lacked three of its five required assertions. → rewritten: mail arrives
+      after setup, two time-driven poll cycles, exactly one state change per sensor, no `\Seen`, no
+      notification, no credential in caplog or diagnostics; identical and re-attached bytes.
+- [x] [major] layer 2 was never tested through a poll; "skipped before parsing" never asserted. →
+      `tests/test_imap_dedup.py`.
+- [x] [minor] no explicit timeouts; a refused connect surfaced as an empty `TimeoutError` after 10 s
+      plus "Task exception was never retrieved"; transport never closed. → 30 s/command, 120 s/poll,
+      5 s/teardown step, `_client_task` awaited, `disconnect()` closes the transport.
+- [x] [minor] first poll blocked setup → background task. [minor] IMAP parse failure raised no
+      notification → it does (§7). [minor] `BAD` / `NO [UNAVAILABLE]` started reauth → transient.
+      [minor] failure notification never dismissed → dismissed on success. [minor] blank host,
+      non-address senders, empty subject filter accepted → rejected. [minor] design said
+      `OptionsFlowWithReload` → §5.4 amended. [minor] password/username in `ImapSettings` repr →
+      `repr=False`. [minor] aioimaplib debug-log masking → documented §5.5. [minor] reauth test never
+      saw a flow start → asserted. [minor] missing tests → added. [minor] 580-line test module →
+      split into `test_imap.py`, `test_imap_dedup.py`, `test_imap_failures.py`.
+
+## Closed — round 2 (test gaps; code was already correct)
+
+- [x] [minor] string UID sort survived → multi-digit UID case. **KILLED**.
+- [x] [minor] removing `disconnect` survived; [minor] removing the teardown cap survived → a
+      real-socket server that ignores `LOGOUT`, asserting prompt disconnect. Both **KILLED**.
+- [x] [minor] removing the 120 s poll deadline survived → stalled-session test. **KILLED**.
+
+## Accepted, not changed
+
+- [nit] `rejected_hashes` / `seen_messages` are per HA run: after a restart or reload the 14-day
+      window is downloaded once more and a still-rejected attachment notifies once more. As designed.
+- [nit] a non-parse exception during ingest (e.g. a storage write error) surfaces as HA's
+      "Unexpected error" and does not count towards the 3-failure notification.

@@ -40,3 +40,12 @@ def config_entry() -> MockConfigEntry:
         title="School menu",
         data={},
     )
+
+
+@pytest.fixture
+def mail_entry() -> MockConfigEntry:
+    from tests.fake_imap import MAILBOX
+
+    return MockConfigEntry(
+        domain=DOMAIN, unique_id=SINGLE_ENTRY_UNIQUE_ID, title="School menu", data=dict(MAILBOX)
+    )

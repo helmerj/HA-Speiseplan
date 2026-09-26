@@ -402,6 +402,14 @@ documented card YAML is copy-pasteable with no placeholders.
 Credentials are written to **`entry.data`** via `async_update_entry`, never to `entry.options`,
 so they stay out of options diffs. Auth failure during polling → `ConfigEntryAuthFailed` → reauth flow.
 
+**Amendment 2026-09-26 — plain `OptionsFlow` plus an explicit reload, and validation.** Because every
+field is written to `entry.data`, `entry.options` stays `{}`; `OptionsFlowWithReload` reloads only when
+the options change and would therefore never reload. The flow is a plain `OptionsFlow` that calls
+`async_schedule_reload` itself. The form rejects: an empty `host`; an empty `senders` list or any
+sender that is not an e-mail address; an empty `subject_filter` (it would match every mail); a missing
+password when none is stored yet. `senders` stays **≥1**, not exactly two — the two teachers are the
+default, not a rule.
+
 ### 5.5 IMAP client and deduplication (M2)
 
 **Search.** Per poll, per configured sender:
@@ -412,6 +420,34 @@ composable for N senders and avoid server-specific OR quirks.)
 **Fetch.** `BODY.PEEK[]` only — the `\Seen` flag is **never** set and no other mailbox state is
 modified (§10 R5). HA and your mail client never compete for the same message, and HA being offline
 all weekend still picks up Sunday's mail on Monday because the window is date-based, not flag-based.
+
+**Amendment 2026-09-26 — session shape, fetch order and download volume** (M3 review):
+
+- **`EXAMINE`, never `SELECT`.** The folder is opened read-only. `CLOSE` after a read-write `SELECT`
+  expunges every `\Deleted` message in the folder — a mailbox mutation R5 forbids. aioimaplib 2.0.1's
+  `examine()` does not move its protocol to the `SELECTED` state (only `select()` does), so
+  `imap_client.py` ships `ReadOnlyIMAP4` / `ReadOnlyIMAP4SSL`, which fix that state transition.
+- **The session is always torn down** — `CLOSE`, `LOGOUT`, then the transport is closed — in a
+  `finally`, on success and on every error path. A failed connect (refused, DNS, TLS) surfaces as that
+  error, not as a silent 10 s timeout.
+- **Timeouts:** 30 s per command, 120 s for the whole poll.
+- **SSL context:** `homeassistant.util.ssl.client_context()` (cached), never built on the event loop.
+- **Order:** the UID union is processed in **ascending UID order**, i.e. arrival order, so the newest
+  mail is applied last. Per-sender order would let a stale forward from teacher B overwrite a
+  correction teacher A sent later.
+- **Header first.** Each UID is fetched as `BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)]`; the full
+  `BODY.PEEK[]` is fetched only for messages that pass the sender and subject filter.
+- **Download cache.** A message whose `(UIDVALIDITY, UID)` was already processed in this HA run is not
+  downloaded again. This is an in-memory transfer optimisation only; the dedup key stays the content
+  hash, and a `UIDVALIDITY` change simply invalidates the cache. When the server reports no
+  `UIDVALIDITY`, nothing is cached.
+- **LOGIN outcome:** `NO` means bad credentials → reauth. `BAD`, or a `NO` carrying `[UNAVAILABLE]`,
+  is a transient failure → `UpdateFailed`.
+- **Credential hygiene:** `ImapSettings` hides the password from its `repr`. aioimaplib's own `DEBUG`
+  log masks the password only by exact substring, so `aioimaplib` is not listed in the manifest's
+  `loggers`, and enabling its debug log is at the operator's own risk.
+- **Setup does not wait for the mailbox:** the first poll runs as a background task, so a hung server
+  cannot delay HA startup.
 
 **Filter.** A message is a candidate when *all* hold:
 1. `From` is one of the configured senders (already guaranteed by the search, re-checked locally).
@@ -432,6 +468,16 @@ German KW is the ISO week, so `(iso_year_from_message_date, kw)` gives a Monday.
 | 1 — byte identity | `sha256(attachment)` is already in any stored week's `content_hashes` | Skip before parsing. `DEBUG` log. No store write, no listener update. |
 | 2 — content identity | Hash is new, but the parsed `ParsedWeek` has the same week key **and** identical `days` as what is stored | Append the hash to `content_hashes` so layer 1 catches it next time. No listener update. `DEBUG` log. |
 | 3 — genuine update | Hash is new and the parsed days differ from what is stored for that week | Overwrite the week, append the hash, update listeners. `INFO` log naming the week and what changed count-wise. |
+
+**Amendment 2026-09-26 — listener updates and the shrink guard.** The coordinator runs with
+`always_update=False`, so a poll that only met layers 1 and 2 notifies **no** listener; only layer 3
+calls `async_set_updated_data`. Layer 3 has one exception for the **IMAP path only**: when the incoming
+week carries a strict subset of the days already stored for that week, it is refused rather than
+overwriting — a degraded parse (a day anchor that lost its lines) must not shrink a good week
+unattended. The refusal raises the `school_menu_import_error` notification naming the file and reason
+`fewer_days`, and the hash is remembered for the rest of the HA run so it is neither re-parsed nor
+re-notified every poll. A **manual** `import_pdf` of the same file always overwrites: the operator's
+explicit action is how a genuine correction that drops a day (a Studientag) gets in.
 
 Layer 2 is the one that matters: the two teachers may forward or re-attach the file such that the bytes
 differ while the menu is identical. Without it, the second mail would rewrite the store and bump
@@ -492,7 +538,8 @@ therefore also listens for `EVENT_CORE_CONFIG_UPDATE` and refreshes the listener
 | Duplicate mail from the second sender | Layer 1 or 2 of §5.5 → skipped, `DEBUG` log only, no state churn. |
 | Subject/sender no longer matches (silent stop) | **No alarm by design.** `last_import` goes stale and is visible on the card (§10 R15); alarming would false-fire through every Ferien. |
 | IMAP auth failure (M2) | `ConfigEntryAuthFailed` → HA reauth flow. |
-| IMAP transient failure (M2) | `UpdateFailed` → coordinator backs off; notification only after 3 consecutive failures, to avoid nagging on a flaky link. |
+| IMAP transient failure (M2) | `UpdateFailed` → coordinator backs off; notification only after 3 consecutive failures, to avoid nagging on a flaky link. The notification is dismissed on the next successful poll. |
+| IMAP attachment that cannot be parsed, or is refused by the shrink guard (M2) | **Per attachment, never per poll:** every other attachment in the same poll is still processed. `school_menu_import_error` notification with filename and reason, once per HA run; the hash is remembered so the next poll neither re-parses nor re-notifies. Any exception out of pypdf on a malformed file counts as a `MenuParseError` (`no_text_layer`). |
 
 **Amendment 2026-09-25 — the notification carries no file content.** v1 of this design said the
 parse-failure notification should include "the first 200 chars of extracted text". It must not. The

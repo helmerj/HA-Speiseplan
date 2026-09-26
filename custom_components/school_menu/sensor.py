@@ -72,6 +72,10 @@ class SchoolMenuSensor(CoordinatorEntity[SchoolMenuCoordinator], SensorEntity):
         self._attr_device_info = _device(entry)
 
     @property
+    def available(self) -> bool:
+        return True
+
+    @property
     def _target(self) -> datetime.date | None:
         return target_date(dt_util.now().date(), self._which)
 
@@ -129,6 +133,10 @@ class LastImportSensor(CoordinatorEntity[SchoolMenuCoordinator], SensorEntity):
         self._attr_name = "Last import"
         self._attr_unique_id = f"{entry.entry_id}_{SENSOR_LAST_IMPORT}"
         self._attr_device_info = _device(entry)
+
+    @property
+    def available(self) -> bool:
+        return True
 
     @property
     def native_value(self) -> datetime.datetime | None:

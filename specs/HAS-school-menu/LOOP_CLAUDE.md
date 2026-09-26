@@ -34,15 +34,17 @@ Full rationale: `docs/0002-design.md` §10 (R1–R15). If implementation needs t
 
 ## Current state
 
-Loop not started. Repo contains `docs/`, `sample file/` (two real PDFs, to be moved to
-`tests/fixtures/` in M0) and `specs/HAS-school-menu/`. **Not yet a git repository.**
+M0–M3 committed and green. M3: 220 tests, coverage 98%, 23/23 mutants killed, review approved in
+round 2. Gates need the venv on PATH: `PATH="$PWD/.venv/bin:$PATH" scripts/gate.sh M<n>`.
 
 ## Next steps
 
-1. M0 — generate the skeleton per TDD_PLAN §5 M0 (one step), then `scripts/gate.sh M0`.
-2. One review round over the generated tree, then the PR.
-3. M1 starts the loop proper at TDD_PLAN §5 M1 step 1 (`extract_lines`).
+1. M4 — Mushroom card YAML (`cards/mushroom-today-tomorrow.yaml`) rendered through HA's `Template`
+   against live sensor states, per TDD_PLAN §5 M4. The Sunday e2e uses Sun 2026-09-27 so that
+   "tomorrow" (Mon 09-28) lies inside `26-40.pdf`.
 
 ## Learnings
 
-_(append as the loop runs)_
+- `freezer` also freezes the event-loop clock: a test relying on `asyncio.timeout` must not use it.
+- Coordinator listener fan-out is invisible in state-change events (identical writes are dropped);
+  count `async_add_listener` callbacks to test "no listener update".
