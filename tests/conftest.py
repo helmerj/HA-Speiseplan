@@ -17,6 +17,11 @@ def auto_enable_custom_integrations(enable_custom_integrations):
     yield
 
 
+@pytest.fixture(autouse=True)
+async def german_timezone(hass):
+    await hass.config.async_update(time_zone="Europe/Berlin")
+
+
 @pytest.fixture
 def week_39_pdf() -> bytes:
     return (FIXTURES / "AHS Speiseplan 26-39.pdf").read_bytes()
@@ -34,4 +39,13 @@ def config_entry() -> MockConfigEntry:
         unique_id=SINGLE_ENTRY_UNIQUE_ID,
         title="School menu",
         data={},
+    )
+
+
+@pytest.fixture
+def mail_entry() -> MockConfigEntry:
+    from tests.fake_imap import MAILBOX
+
+    return MockConfigEntry(
+        domain=DOMAIN, unique_id=SINGLE_ENTRY_UNIQUE_ID, title="School menu", data=dict(MAILBOX)
     )

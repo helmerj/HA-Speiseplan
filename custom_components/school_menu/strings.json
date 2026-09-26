@@ -6,12 +6,81 @@
         "data": {
           "name": "Name"
         }
+      },
+      "reauth_confirm": {
+        "title": "Re-enter the mailbox password",
+        "data": {
+          "password": "Password"
+        }
       }
     },
     "abort": {
       "already_configured": "School menu is already configured. Only one entry is supported.",
       "already_in_progress": "Another School menu configuration flow is already in progress.",
-      "single_instance_allowed": "Only one School menu entry is supported."
+      "single_instance_allowed": "Only one School menu entry is supported.",
+      "reauth_successful": "Password updated."
+    }
+  },
+  "exceptions": {
+    "path_not_allowed": {
+      "message": "{path} is outside the allowed folders. Put the PDF under /config/www or a media folder."
+    },
+    "file_not_found": {
+      "message": "No file at {path}."
+    },
+    "entry_not_loaded": {
+      "message": "The School menu integration is not loaded."
+    },
+    "exactly_one_source": {
+      "message": "Provide exactly one of file_path or file_id."
+    },
+    "upload_not_found": {
+      "message": "That upload is no longer available. Upload the PDF again."
+    }
+  },
+  "services": {
+    "import_pdf": {
+      "name": "Import menu PDF",
+      "description": "Reads a weekly school-menu PDF and stores the week it contains. Either from disk (under /config/www or a media folder) or from an upload.",
+      "fields": {
+        "file_path": {
+          "name": "File path",
+          "description": "Absolute path to the PDF, under /config/www or a media folder."
+        },
+        "file_id": {
+          "name": "Uploaded file",
+          "description": "A PDF uploaded through the UI. Use this or File path, not both."
+        },
+        "week_start": {
+          "name": "Week start",
+          "description": "Monday of the week the PDF covers. Only used when the PDF header has no readable date range."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Mailbox",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "ssl": "Use SSL",
+          "username": "Username",
+          "password": "Password",
+          "folder": "Folder",
+          "senders": "Sender addresses",
+          "subject_filter": "Subject contains",
+          "scan_interval_minutes": "Scan interval (minutes)"
+        }
+      }
+    },
+    "error": {
+      "no_senders": "Add at least one sender address.",
+      "no_password": "Enter the mailbox password.",
+      "no_host": "Enter the IMAP server host name.",
+      "invalid_sender": "Every sender must be a single e-mail address.",
+      "no_subject_filter": "Enter a subject filter; an empty filter would match every mail."
     }
   }
 }

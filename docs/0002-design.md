@@ -66,7 +66,7 @@ flowchart TB
         IM["imap_client.py (M2)<br/>SINCE+FROM search, PEEK fetch, sha256"]
         CO["coordinator.py<br/>SchoolMenuCoordinator (DataUpdateCoordinator)"]
         ST["store.py<br/>MenuStore (Store v1, 4-week prune, hash ledger)"]
-        SE["sensor.py<br/>today + tomorrow + last_import"]
+        SE["sensor.py<br/>today + next_school_day + last_import"]
         N["persistent_notification"]
     end
 
@@ -115,7 +115,7 @@ sequenceDiagram
             CO->>ST: upsert by ISO week key, append hash, prune to 4 weeks
             ST-->>CO: saved
             CO->>SE: async_set_updated_data()
-            SE->>SE: recompute today / tomorrow / last_import, write state
+            SE->>SE: recompute today / next_school_day / last_import, write state
             SV->>U: manual import only → persistent_notification "imported, N days"
         else MenuParseError
             PA-->>SV: raise MenuParseError(reason)
@@ -144,7 +144,7 @@ custom_components/school_menu/
 │                        import entry point, dedup decision, listener fan-out. No parsing, no IO.
 ├── config_flow.py       ConfigFlow (M1: single step, single entry enforced) + OptionsFlowWithReload
 │                        (M2: IMAP host/port/user/pass/folder/senders/subject/interval).
-├── sensor.py            SchoolMenuSensor ×2 (today, tomorrow) + LastImportSensor (diagnostic).
+├── sensor.py            SchoolMenuSensor ×2 (today, next_school_day) + LastImportSensor (diagnostic).
 │                        Pure projection of coordinator state; CoordinatorEntity subclasses.
 ├── date_logic.py        Pure. target_date(today, which), weekday naming, week derivation.
 ├── imap_client.py       (M2) aioimaplib client: connect, SINCE+FROM search, BODY.PEEK fetch,
@@ -253,7 +253,7 @@ re-import — impossible in practice, because the IMAP search window is 14 days.
 
 ### 4.3 Sensor state and attributes
 
-| | `sensor.school_menu_today` / `_tomorrow` |
+| | `sensor.school_menu_today` / `_next_school_day` |
 |---|---|
 | state (menu found) | `main` — cleaned first line, e.g. `Pasta mit Tomaten Sauce dazu Parmesan` |
 | state (no menu) | the literal string `none` (§10 R1) |
@@ -385,8 +385,16 @@ Handler contract:
 **M1 config flow** — one step, no connection to test yet:
 `async_step_user` → optional `name` (default `School menu`) → `async_create_entry`.
 A **fixed** unique id plus `_abort_if_unique_id_configured` enforces **exactly one entry, ever**
-(§10 R2). Entity ids therefore stay `sensor.school_menu_today` / `_tomorrow` / `_last_import`, and the
+(§10 R2). Entity ids therefore stay `sensor.school_menu_today` / `_next_school_day` / `_last_import`, and the
 documented card YAML is copy-pasteable with no placeholders.
+
+**Amendment 2026-09-26 — entity ids are pinned explicitly.** The single-entry rule alone does not fix
+the ids: Home Assistant derives them from the device name, i.e. the entry *title*, which the user
+types in the config flow. The first live install was titled "AHS Speiseplan" and got
+`sensor.ahs_speiseplan_*`, so the documented card showed "Speiseplan nicht verfügbar". Each entity
+therefore sets `entity_id = sensor.school_menu_<key>` before registration. HA only honours that for a
+new registry entry; an existing install keeps its ids until the entry is re-added or the ids are
+renamed in the UI.
 
 **M2 options flow** — `OptionsFlowWithReload`, step `init`:
 
@@ -402,6 +410,14 @@ documented card YAML is copy-pasteable with no placeholders.
 Credentials are written to **`entry.data`** via `async_update_entry`, never to `entry.options`,
 so they stay out of options diffs. Auth failure during polling → `ConfigEntryAuthFailed` → reauth flow.
 
+**Amendment 2026-09-26 — plain `OptionsFlow` plus an explicit reload, and validation.** Because every
+field is written to `entry.data`, `entry.options` stays `{}`; `OptionsFlowWithReload` reloads only when
+the options change and would therefore never reload. The flow is a plain `OptionsFlow` that calls
+`async_schedule_reload` itself. The form rejects: an empty `host`; an empty `senders` list or any
+sender that is not an e-mail address; an empty `subject_filter` (it would match every mail); a missing
+password when none is stored yet. `senders` stays **≥1**, not exactly two — the two teachers are the
+default, not a rule.
+
 ### 5.5 IMAP client and deduplication (M2)
 
 **Search.** Per poll, per configured sender:
@@ -412,6 +428,34 @@ composable for N senders and avoid server-specific OR quirks.)
 **Fetch.** `BODY.PEEK[]` only — the `\Seen` flag is **never** set and no other mailbox state is
 modified (§10 R5). HA and your mail client never compete for the same message, and HA being offline
 all weekend still picks up Sunday's mail on Monday because the window is date-based, not flag-based.
+
+**Amendment 2026-09-26 — session shape, fetch order and download volume** (M3 review):
+
+- **`EXAMINE`, never `SELECT`.** The folder is opened read-only. `CLOSE` after a read-write `SELECT`
+  expunges every `\Deleted` message in the folder — a mailbox mutation R5 forbids. aioimaplib 2.0.1's
+  `examine()` does not move its protocol to the `SELECTED` state (only `select()` does), so
+  `imap_client.py` ships `ReadOnlyIMAP4` / `ReadOnlyIMAP4SSL`, which fix that state transition.
+- **The session is always torn down** — `CLOSE`, `LOGOUT`, then the transport is closed — in a
+  `finally`, on success and on every error path. A failed connect (refused, DNS, TLS) surfaces as that
+  error, not as a silent 10 s timeout.
+- **Timeouts:** 30 s per command, 120 s for the whole poll.
+- **SSL context:** `homeassistant.util.ssl.client_context()` (cached), never built on the event loop.
+- **Order:** the UID union is processed in **ascending UID order**, i.e. arrival order, so the newest
+  mail is applied last. Per-sender order would let a stale forward from teacher B overwrite a
+  correction teacher A sent later.
+- **Header first.** Each UID is fetched as `BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)]`; the full
+  `BODY.PEEK[]` is fetched only for messages that pass the sender and subject filter.
+- **Download cache.** A message whose `(UIDVALIDITY, UID)` was already processed in this HA run is not
+  downloaded again. This is an in-memory transfer optimisation only; the dedup key stays the content
+  hash, and a `UIDVALIDITY` change simply invalidates the cache. When the server reports no
+  `UIDVALIDITY`, nothing is cached.
+- **LOGIN outcome:** `NO` means bad credentials → reauth. `BAD`, or a `NO` carrying `[UNAVAILABLE]`,
+  is a transient failure → `UpdateFailed`.
+- **Credential hygiene:** `ImapSettings` hides the password from its `repr`. aioimaplib's own `DEBUG`
+  log masks the password only by exact substring, so `aioimaplib` is not listed in the manifest's
+  `loggers`, and enabling its debug log is at the operator's own risk.
+- **Setup does not wait for the mailbox:** the first poll runs as a background task, so a hung server
+  cannot delay HA startup.
 
 **Filter.** A message is a candidate when *all* hold:
 1. `From` is one of the configured senders (already guaranteed by the search, re-checked locally).
@@ -433,6 +477,16 @@ German KW is the ISO week, so `(iso_year_from_message_date, kw)` gives a Monday.
 | 2 — content identity | Hash is new, but the parsed `ParsedWeek` has the same week key **and** identical `days` as what is stored | Append the hash to `content_hashes` so layer 1 catches it next time. No listener update. `DEBUG` log. |
 | 3 — genuine update | Hash is new and the parsed days differ from what is stored for that week | Overwrite the week, append the hash, update listeners. `INFO` log naming the week and what changed count-wise. |
 
+**Amendment 2026-09-26 — listener updates and the shrink guard.** The coordinator runs with
+`always_update=False`, so a poll that only met layers 1 and 2 notifies **no** listener; only layer 3
+calls `async_set_updated_data`. Layer 3 has one exception for the **IMAP path only**: when the incoming
+week carries a strict subset of the days already stored for that week, it is refused rather than
+overwriting — a degraded parse (a day anchor that lost its lines) must not shrink a good week
+unattended. The refusal raises the `school_menu_import_error` notification naming the file and reason
+`fewer_days`, and the hash is remembered for the rest of the HA run so it is neither re-parsed nor
+re-notified every poll. A **manual** `import_pdf` of the same file always overwrites: the operator's
+explicit action is how a genuine correction that drops a day (a Studientag) gets in.
+
 Layer 2 is the one that matters: the two teachers may forward or re-attach the file such that the bytes
 differ while the menu is identical. Without it, the second mail would rewrite the store and bump
 `last_import` for no reason. Message UIDs are deliberately *not* used as the dedup key — they reset on
@@ -446,11 +500,13 @@ All "now" comes from `homeassistant.util.dt.now()` (HA-configured tz); the pure 
 argument and never calls `datetime.now()` itself — that is what makes it testable without freezing a clock.
 
 ```python
-def target_date(today: datetime.date, which: Literal["today", "tomorrow"]) -> datetime.date | None
+def target_date(
+    today: datetime.date, which: Literal["today", "next_school_day"]
+) -> datetime.date | None
 ```
 
 - `today`: returns `today` if Mon–Fri, else `None` → state `none`, `reason: weekend`.
-- `tomorrow`: returns the **next weekday strictly after `today`** (§10 R3).
+- `next_school_day`: returns the **next weekday strictly after `today`** (§10 R3).
   Mon–Thu → `+1`; **Fri → Monday (+3); Sat → Monday (+2); Sun → Monday (+1)**.
   The sensor is therefore never `none` for calendar reasons — only when data is genuinely missing.
   The `date` and `weekday` attributes disambiguate, and the card shows them.
@@ -462,7 +518,16 @@ crosses New Year (`28.12.26 – 01.01.27`) correct for free; `2026-12-28` is `20
 **Rollover:** `async_track_time_change(hass, _at_midnight, hour=0, minute=0, second=0)`, registered in
 `async_setup_entry` and torn down via `entry.async_on_unload`. The callback only calls
 `coordinator.async_update_listeners()` — no IO, no refetch. Wall-clock based, so it survives DST
-transitions and a tz change in HA settings without special handling.
+transitions without special handling: verified against HA's own scheduler across both 2026
+transitions in Europe/Berlin, it fires exactly once per local calendar date (23 h apart in spring,
+25 h in autumn).
+
+**Amendment 2026-09-25 — a timezone change DOES need handling.** v1 of this section claimed the
+rollover also survives a tz change in HA settings "without special handling". That was wrong.
+`_TrackUTCTimeChange` recomputes its schedule only when it fires and registers no core-config
+listener, so after changing the zone both sensors keep the old day until the next (old-zone)
+midnight — up to ~24 h, during which `today` can report a school day as a weekend. The entry
+therefore also listens for `EVENT_CORE_CONFIG_UPDATE` and refreshes the listeners immediately.
 
 **Coordinator shape (§10 R13):** `SchoolMenuCoordinator` subclasses `DataUpdateCoordinator` from M1 with
 `update_interval=None` — no polling in M1, but the listener fan-out, `async_set_updated_data`, and the
@@ -474,7 +539,7 @@ transitions and a tz change in HA settings without special handling.
 
 | Situation | Behaviour |
 |---|---|
-| Parse failure (any `MenuParseError`) | **Stored data untouched.** `persistent_notification.async_create` with the reason key, the filename, and the first 200 chars of extracted text. Notification id `school_menu_import_error` so repeats replace rather than pile up. Service raises `HomeAssistantError` so the caller/automation sees it fail. |
+| Parse failure (any `MenuParseError`) | **Stored data untouched.** `persistent_notification.async_create` with the reason key and the filename — **not** the extracted text (amended 2026-09-25, see below). Notification id `school_menu_import_error` so repeats replace rather than pile up. Service raises `HomeAssistantError` so the caller/automation sees it fail. |
 | Path outside allowlist, bad args, entry not loaded | `ServiceValidationError` — shown inline in the UI, no notification, not an integration fault. |
 | **Manual** import success | `persistent_notification` (id `school_menu_import_ok`, replaced on next success) naming the week and day count. |
 | **IMAP** import success | **No notification** (§10 R8). `INFO` log; `sensor.school_menu_last_import` updates. A weekly notification you must dismiss would train you to ignore the failure notifications. |
@@ -483,7 +548,21 @@ transitions and a tz change in HA settings without special handling.
 | Duplicate mail from the second sender | Layer 1 or 2 of §5.5 → skipped, `DEBUG` log only, no state churn. |
 | Subject/sender no longer matches (silent stop) | **No alarm by design.** `last_import` goes stale and is visible on the card (§10 R15); alarming would false-fire through every Ferien. |
 | IMAP auth failure (M2) | `ConfigEntryAuthFailed` → HA reauth flow. |
-| IMAP transient failure (M2) | `UpdateFailed` → coordinator backs off; notification only after 3 consecutive failures, to avoid nagging on a flaky link. |
+| IMAP transient failure (M2) | `UpdateFailed` → coordinator backs off; notification only after 3 consecutive failures, to avoid nagging on a flaky link. The notification is dismissed on the next successful poll. |
+| IMAP attachment that cannot be parsed, or is refused by the shrink guard (M2) | **Per attachment, never per poll:** every other attachment in the same poll is still processed. `school_menu_import_error` notification with filename and reason, once per HA run; the hash is remembered so the next poll neither re-parses nor re-notifies. Any exception out of pypdf on a malformed file counts as a `MenuParseError` (`no_text_layer`). |
+
+**Amendment 2026-09-25 — the notification carries no file content.** v1 of this design said the
+parse-failure notification should include "the first 200 chars of extracted text". It must not. The
+allowlist validates the path, and the file is opened a moment later in the executor; anyone able to
+write into `/config/www` (which Home Assistant also serves unauthenticated at `/local/`) could swap a
+symlink in that window. With a content-free notification that race leaks nothing. Echoing 200
+characters of whatever was actually opened would turn `import_pdf` into a partial arbitrary-read
+oracle. The reason key plus the filename is enough to diagnose a bad PDF; the extracted text goes to
+the debug log, which is not world-readable.
+
+**Amendment 2026-09-25 — `file_path` is `required: true` until M2.** §5.3 specifies exactly-one-of
+`file_path`/`file_id`. `file_id` (the upload path) is M2 work, so M1 ships `file_path` as required.
+The exactly-one-of rule applies once `file_id` exists.
 
 Credentials never appear in logs, notifications, attributes, or diagnostics (`TO_REDACT = {"password", "username"}`).
 
@@ -553,6 +632,22 @@ string list passed to `parse_lines`, so the cases are readable and diffable in t
   a small "Stand: …" line; theme variables only, so light/dark follow the active theme; readable at 400 px;
   weekend/empty shows **"Kein Mittagessen"** (§10 R10).
 
+**Amendment 2026-09-26 — card layout (M4 review).** Mushroom's template card renders `primary` on one
+line and truncates it with an ellipsis; only `secondary` wraps (`multiline_secondary`). A 46-character
+main such as "Blumenkohl-Brokkoli-Möhre mit Käse überbacken" does not fit in a 400 px tile's primary,
+so "prominent main" is realised as **the first line of the wrapping `secondary`**, and `primary`
+carries the short day label:
+
+| Tile | `primary` (one line) | `secondary` (wraps) |
+|---|---|---|
+| today | `Heute · <Wochentag>, <TT.MM.>` | main, then every further line joined by ` · ` — or `Kein Mittagessen` |
+| next school day | `Morgen · <Wochentag>, <TT.MM.>` when that day is the next calendar day, else `<Wochentag>, <TT.MM.>` (Fri–Sun → Monday, §10 R3) | main — or `Kein Mittagessen` — then `Stand: <TT.MM.>` |
+
+`Kein Mittagessen` means *the integration is running and there is no lunch* (weekend, holiday, no
+menu). When a menu sensor is `unavailable`/`unknown` — the integration is not loaded — the tile says
+`Speiseplan nicht verfügbar` instead, and no `Stand:` line is claimed. The documented card is tested
+through `Template.async_render_to_info(strict=True)`, the path the `render_template` websocket uses.
+
 ## 10. Resolved decisions — design grilling, 2026-09-25
 
 All 15 branches closed. These are binding; §§1–9 above already reflect them.
@@ -561,7 +656,7 @@ All 15 branches closed. These are binding; §§1–9 above already reflect them.
 |---|---|---|---|
 | R1 | No-menu sensor state | Literal string `none` (your brief over the HA `unknown` idiom), `reason: weekend\|no_menu` | §4.3 |
 | R2 | Config entry count | Exactly one, enforced by fixed unique id; `config_entry_id` removed from the service | §5.3, §5.4 |
-| R3 | `tomorrow` on Fri/Sat/Sun | Next weekday — all three resolve to Monday | §6 |
+| R3 | `tomorrow` on Fri/Sat/Sun | Next weekday — all three resolve to Monday. **Amended 2026-09-26:** the sensor is named for what it is — `sensor.school_menu_next_school_day` ("Next school day"), not `_tomorrow` | §6 |
 | R4 | Store retention | Newest 4 weeks by `week_start`, unchanged; safe because ≤1 future week is ever in flight | §4.2 |
 | R5 | IMAP selection | `SINCE today-14d` + `FROM <sender>`, `BODY.PEEK[]`, `\Seen` never set | §5.5 |
 | R6 | Day with 4–5 lines | Keep all in `lines`, `WARNING` log, no wrap-merge heuristic | §5.1 step 5 |
@@ -583,3 +678,32 @@ the subject additionally serves as a `fallback_week_start` source and as a cross
 header, with the header authoritative.
 
 **Nothing is open.** Phase 3 (M1) can start on approval.
+
+**Amendment 2026-09-26 — `tomorrow` renamed to `next_school_day` (R3).** First contact with a live
+instance on a Saturday: the entities card showed "Tomorrow: Pasta …" while tomorrow was Sunday. R3's
+behaviour (Fri/Sat/Sun → Monday) is kept by the operator's decision; the *name* was the defect. The
+sensor is now `sensor.school_menu_next_school_day`, friendly name "Next school day", unique id
+`<entry_id>_next_school_day`, and `date_logic.target_date` takes `"next_school_day"`. The card's
+"Morgen · …" label already appears only when that day is the next calendar day. Entries created
+before the rename keep an orphaned `sensor.school_menu_tomorrow` in the registry, to be removed by
+hand — acceptable pre-release, with one known test install.
+
+**Amendment 2026-09-26 — from the first live Gmail run.**
+
+- **A rejected LOGIN names the server's reason.** Gmail answered a mistyped app password with
+  `NO [AUTHENTICATIONFAILED] Invalid credentials (Failure)`, but the log said only `NO`, which left the
+  operator guessing. `ImapAuthError` / `ImapTransportError` now carry the server's response text,
+  truncated to 200 characters, with the configured username and password replaced by `***` in case a
+  server echoes them. §7's "credentials never appear in logs" still holds.
+- **Removing the entry removes its store.** `async_remove_entry` deletes `.storage/school_menu.<entry_id>`.
+  Before this, deleting and re-adding the integration (as the entity-id fix requires) left the old
+  week file behind for ever.
+
+**Amendment 2026-09-26 — the next-school-day tile shows every line.** The §9 card table gave the
+next-school-day tile the main course only. On the live dashboard that read as data loss ("Blattsalat
+mit gerösteten Kernen" and "Obst" missing for Monday, although both are stored). The tile now renders
+like today's: the main, then every further line joined by ` · `, then `Stand: <TT.MM.>`.
+
+**Amendment 2026-09-26 — card header.** The card opens with a `custom:mushroom-title-card` reading
+"AHS Speiseplan" (operator request), above the today and next-school-day tiles.
+

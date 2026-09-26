@@ -6,12 +6,81 @@
         "data": {
           "name": "Name"
         }
+      },
+      "reauth_confirm": {
+        "title": "Passwort des Postfachs erneut eingeben",
+        "data": {
+          "password": "Passwort"
+        }
       }
     },
     "abort": {
       "already_configured": "Der Speiseplan ist bereits eingerichtet. Nur ein Eintrag wird unterstützt.",
       "already_in_progress": "Es läuft bereits eine Einrichtung des Speiseplans.",
-      "single_instance_allowed": "Es wird nur ein Speiseplan-Eintrag unterstützt."
+      "single_instance_allowed": "Es wird nur ein Speiseplan-Eintrag unterstützt.",
+      "reauth_successful": "Passwort aktualisiert."
+    }
+  },
+  "exceptions": {
+    "path_not_allowed": {
+      "message": "{path} liegt außerhalb der erlaubten Ordner. Lege die PDF unter /config/www oder in einen Medienordner."
+    },
+    "file_not_found": {
+      "message": "Keine Datei unter {path}."
+    },
+    "entry_not_loaded": {
+      "message": "Die Speiseplan-Integration ist nicht geladen."
+    },
+    "exactly_one_source": {
+      "message": "Gib genau eines von file_path oder file_id an."
+    },
+    "upload_not_found": {
+      "message": "Dieser Upload ist nicht mehr verfügbar. Lade die PDF erneut hoch."
+    }
+  },
+  "services": {
+    "import_pdf": {
+      "name": "Speiseplan-PDF importieren",
+      "description": "Liest eine Wochen-PDF des Speiseplans und speichert die enthaltene Woche. Entweder von der Festplatte (unter /config/www oder in einem Medienordner) oder aus einem Upload.",
+      "fields": {
+        "file_path": {
+          "name": "Dateipfad",
+          "description": "Absoluter Pfad zur PDF, unter /config/www oder in einem Medienordner."
+        },
+        "file_id": {
+          "name": "Hochgeladene Datei",
+          "description": "Eine über die Oberfläche hochgeladene PDF. Entweder dies oder Dateipfad, nicht beides."
+        },
+        "week_start": {
+          "name": "Wochenbeginn",
+          "description": "Montag der Woche, die die PDF abdeckt. Wird nur benutzt, wenn die PDF keinen lesbaren Datumsbereich hat."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Mailbox",
+        "data": {
+          "host": "Server",
+          "port": "Port",
+          "ssl": "SSL verwenden",
+          "username": "Benutzername",
+          "password": "Passwort",
+          "folder": "Ordner",
+          "senders": "Absenderadressen",
+          "subject_filter": "Betreff enthält",
+          "scan_interval_minutes": "Abrufintervall (Minuten)"
+        }
+      }
+    },
+    "error": {
+      "no_senders": "Gib mindestens eine Absenderadresse an.",
+      "no_password": "Gib das Passwort des Postfachs ein.",
+      "no_host": "Gib den Namen des IMAP-Servers ein.",
+      "invalid_sender": "Jeder Absender muss eine einzelne E-Mail-Adresse sein.",
+      "no_subject_filter": "Gib einen Betreff-Filter an; ein leerer Filter würde jede Mail treffen."
     }
   }
 }

@@ -10,10 +10,14 @@
   ],
   "documentation": "https://github.com/helmerj/HA-Speiseplan",
   "integration_type": "service",
-  "iot_class": "local_polling",
+  "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/helmerj/HA-Speiseplan/issues",
+  "loggers": [
+    "pypdf"
+  ],
   "requirements": [
-    "pypdf==6.19.0"
+    "pypdf==6.19.0",
+    "aioimaplib==2.0.1"
   ],
   "single_config_entry": true,
   "version": "0.1.0"

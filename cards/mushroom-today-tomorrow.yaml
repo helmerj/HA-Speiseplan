@@ -1,0 +1,55 @@
+type: vertical-stack
+cards:
+  - type: custom:mushroom-title-card
+    title: AHS Speiseplan
+  - type: custom:mushroom-template-card
+    entity: sensor.school_menu_today
+    icon: mdi:food
+    primary: |-
+      {%- set e = 'sensor.school_menu_today' -%}
+      {%- set d = state_attr(e, 'date') -%}
+      {{ 'Heute · ' ~ state_attr(e, 'weekday') ~ ', ' ~ d[8:10] ~ '.' ~ d[5:7] ~ '.' if d else 'Heute' }}
+    secondary: |-
+      {%- set e = 'sensor.school_menu_today' -%}
+      {%- set lines = state_attr(e, 'lines') or [] -%}
+      {%- if states(e) in ['unavailable', 'unknown'] -%}
+      Speiseplan nicht verfügbar
+      {%- elif lines -%}
+      {{ lines[0] }}
+      {{ lines[1:] | join(' · ') }}
+      {%- else -%}
+      Kein Mittagessen
+      {%- endif -%}
+    multiline_secondary: true
+    tap_action:
+      action: more-info
+  - type: custom:mushroom-template-card
+    entity: sensor.school_menu_next_school_day
+    icon: mdi:food-fork-drink
+    primary: |-
+      {%- set e = 'sensor.school_menu_next_school_day' -%}
+      {%- set d = state_attr(e, 'date') -%}
+      {%- set label = state_attr(e, 'weekday') ~ ', ' ~ d[8:10] ~ '.' ~ d[5:7] ~ '.' if d else '' -%}
+      {%- if not d -%}
+      Morgen
+      {%- elif d == (now().date() + timedelta(days=1)).isoformat() -%}
+      Morgen · {{ label }}
+      {%- else -%}
+      {{ label }}
+      {%- endif -%}
+    secondary: |-
+      {%- set e = 'sensor.school_menu_next_school_day' -%}
+      {%- set lines = state_attr(e, 'lines') or [] -%}
+      {%- set stand = as_datetime(states('sensor.school_menu_last_import'), None) -%}
+      {%- if states(e) in ['unavailable', 'unknown'] -%}
+      Speiseplan nicht verfügbar
+      {%- else -%}
+      {{ lines[0] if lines else 'Kein Mittagessen' }}
+      {%- if lines[1:] %}
+      {{ lines[1:] | join(' · ') }}
+      {%- endif %}
+      Stand: {{ as_local(stand).strftime('%d.%m.') if stand else 'noch kein Import' }}
+      {%- endif -%}
+    multiline_secondary: true
+    tap_action:
+      action: more-info
