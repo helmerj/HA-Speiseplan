@@ -1,5 +1,7 @@
 type: vertical-stack
 cards:
+  - type: custom:mushroom-title-card
+    title: AHS Speiseplan
   - type: custom:mushroom-template-card
     entity: sensor.school_menu_today
     icon: mdi:food

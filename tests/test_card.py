@@ -65,6 +65,12 @@ def test_the_card_is_two_mushroom_template_cards_for_today_and_the_next_school_d
     assert all(tile.get("multiline_secondary") is True for tile in tiles)
 
 
+def test_the_card_opens_with_the_school_header() -> None:
+    first = load_card()["cards"][0]
+
+    assert first == {"type": "custom:mushroom-title-card", "title": "AHS Speiseplan"}
+
+
 def test_the_card_follows_the_theme() -> None:
     source = CARD.read_text()
 

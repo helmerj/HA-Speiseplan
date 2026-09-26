@@ -704,3 +704,6 @@ next-school-day tile the main course only. On the live dashboard that read as da
 mit gerösteten Kernen" and "Obst" missing for Monday, although both are stored). The tile now renders
 like today's: the main, then every further line joined by ` · `, then `Stand: <TT.MM.>`.
 
+**Amendment 2026-09-26 — card header.** The card opens with a `custom:mushroom-title-card` reading
+"AHS Speiseplan" (operator request), above the today and next-school-day tiles.
+

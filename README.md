@@ -58,6 +58,8 @@ Add a card → **Manual**, and paste:
 ```yaml
 type: vertical-stack
 cards:
+  - type: custom:mushroom-title-card
+    title: AHS Speiseplan
   - type: custom:mushroom-template-card
     entity: sensor.school_menu_today
     icon: mdi:food
@@ -111,8 +113,9 @@ cards:
       action: more-info
 ```
 
-The same YAML ships as `cards/mushroom-today-tomorrow.yaml`. It uses the fixed entity ids, so it needs
-no editing, and theme variables only, so light and dark mode follow your theme.
+The card opens with the header **AHS Speiseplan**; change the `title:` line if you like. The same
+YAML ships as `cards/mushroom-today-tomorrow.yaml`. It uses the fixed entity ids, so it needs no
+editing, and theme variables only, so light and dark mode follow your theme.
 
 | Tile | Title line | Text (wraps, so long dishes are never cut off) |
 |---|---|---|
