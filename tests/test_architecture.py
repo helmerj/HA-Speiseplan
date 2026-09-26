@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-PURE_MODULES = ("parser.py", "cleaning.py", "models.py", "date_logic.py")
+PURE_MODULES = ("parser.py", "cleaning.py", "models.py", "date_logic.py", "icons.py")
 ROOT = Path(__file__).parents[1]
 COMPONENT = ROOT / "custom_components" / "school_menu"
 TESTS = ROOT / "tests"

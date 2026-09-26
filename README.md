@@ -62,7 +62,7 @@ cards:
     title: AHS Speiseplan
   - type: custom:mushroom-template-card
     entity: sensor.school_menu_today
-    icon: mdi:food
+    icon: "{{ state_attr('sensor.school_menu_today', 'icon') or 'mdi:food' }}"
     primary: |-
       {%- set e = 'sensor.school_menu_today' -%}
       {%- set d = state_attr(e, 'date') -%}
@@ -83,7 +83,7 @@ cards:
       action: more-info
   - type: custom:mushroom-template-card
     entity: sensor.school_menu_next_school_day
-    icon: mdi:food-fork-drink
+    icon: "{{ state_attr('sensor.school_menu_next_school_day', 'icon') or 'mdi:food' }}"
     primary: |-
       {%- set e = 'sensor.school_menu_next_school_day' -%}
       {%- set d = state_attr(e, 'date') -%}
@@ -121,6 +121,10 @@ editing, and theme variables only, so light and dark mode follow your theme.
 |---|---|---|
 | Today | `Heute · Mittwoch, 30.09.` | the main course, then every further line of the day joined by ` · ` |
 | Next school day | `Morgen · Donnerstag, 01.10.` — on Fri and Sat just `Montag, 05.10.` | its main course, then every further line joined by ` · `, then `Stand: <date of the last import>` |
+
+Each tile's icon follows its main course: pasta, soup, chili, rice, fish, vegetables, salad and so
+on (a keyword table in `custom_components/school_menu/icons.py`); anything unrecognised shows a
+neutral plate.
 
 On weekends, holidays and days without a menu the text reads **Kein Mittagessen**. If the
 integration itself is not running, it reads **Speiseplan nicht verfügbar** instead, so a broken

@@ -11,7 +11,14 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.school_menu.const import DOMAIN
 from custom_components.school_menu.models import DayMenu, ParsedWeek
-from tests.card_render import CARD, card_text, load_card, render_card, template_cards
+from tests.card_render import (
+    CARD,
+    card_text,
+    load_card,
+    render_card,
+    render_icons,
+    template_cards,
+)
 
 TODAY = "sensor.school_menu_today"
 TOMORROW = "sensor.school_menu_next_school_day"
@@ -286,3 +293,32 @@ async def test_every_line_of_the_next_school_day_is_shown(
     assert render_card(hass)[TOMORROW]["secondary"] == (
         "Eintopf\nBrot · Salat · Obst · Tee\nStand: 30.09."
     )
+
+
+async def test_each_tile_shows_the_icon_of_its_dish(
+    hass: HomeAssistant, config_entry: MockConfigEntry, freezer
+) -> None:
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    await _loaded(hass, config_entry, _week())
+
+    assert render_icons(hass) == {TODAY: "mdi:chili-mild", TOMORROW: "mdi:carrot"}
+
+
+async def test_a_day_without_lunch_keeps_the_neutral_icon(
+    hass: HomeAssistant, config_entry: MockConfigEntry, freezer
+) -> None:
+    freezer.move_to("2026-09-26 12:00:00+02:00")
+    await _loaded(hass, config_entry, _week())
+
+    assert render_icons(hass) == {TODAY: "mdi:food", TOMORROW: "mdi:pasta"}
+
+
+@pytest.mark.parametrize("state", ["unavailable", None])
+async def test_a_missing_integration_still_renders_an_icon(
+    hass: HomeAssistant, state: str | None
+) -> None:
+    if state is not None:
+        for entity_id in (TODAY, TOMORROW):
+            hass.states.async_set(entity_id, state, {})
+
+    assert render_icons(hass) == {TODAY: "mdi:food", TOMORROW: "mdi:food"}

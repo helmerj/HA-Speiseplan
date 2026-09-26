@@ -257,3 +257,26 @@ async def test_entity_ids_stay_fixed_whatever_the_entry_is_called(
     assert hass.states.get("sensor.school_menu_today").state == (
         "Pasta mit Tomaten Sauce dazu Parmesan"
     )
+
+
+@pytest.mark.parametrize(
+    ("now", "today_icon", "next_icon"),
+    [
+        ("2026-09-30 10:00:00+02:00", "mdi:chili-mild", "mdi:carrot"),
+        ("2026-10-02 10:00:00+02:00", "mdi:pot-steam", "mdi:food"),
+        ("2026-09-26 10:00:00+02:00", "mdi:food", "mdi:pasta"),
+    ],
+)
+async def test_the_menu_sensors_show_an_icon_matching_the_dish(
+    hass: HomeAssistant,
+    config_entry: MockConfigEntry,
+    freezer,
+    now: str,
+    today_icon: str,
+    next_icon: str,
+) -> None:
+    freezer.move_to(now)
+    await _setup_with_week_40(hass, config_entry)
+
+    assert hass.states.get(TODAY).attributes["icon"] == today_icon
+    assert hass.states.get("sensor.school_menu_next_school_day").attributes["icon"] == next_icon

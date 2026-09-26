@@ -43,3 +43,10 @@ def render_card(hass: HomeAssistant, card: dict[str, Any] | None = None) -> dict
 
 def card_text(hass: HomeAssistant) -> str:
     return "\n".join(value for tile in render_card(hass).values() for value in tile.values())
+
+
+def render_icons(hass: HomeAssistant, card: dict[str, Any] | None = None) -> dict[str, str]:
+    return {
+        tile["entity"]: render(hass, tile["icon"], tile)
+        for tile in template_cards(card or load_card())
+    }

@@ -37,6 +37,7 @@ from .const import (
 )
 from .coordinator import SchoolMenuCoordinator
 from .date_logic import target_date
+from .icons import DEFAULT_ICON, dish_icon
 
 SENSOR_NAMES = {SENSOR_TODAY: "Today", SENSOR_NEXT_SCHOOL_DAY: "Next school day"}
 
@@ -64,7 +65,7 @@ def _device(entry: ConfigEntry) -> DeviceInfo:
 
 class SchoolMenuSensor(CoordinatorEntity[SchoolMenuCoordinator], SensorEntity):
     _attr_has_entity_name = True
-    _attr_icon = "mdi:food"
+    _attr_icon = DEFAULT_ICON
 
     def __init__(self, coordinator: SchoolMenuCoordinator, entry: ConfigEntry, which: str) -> None:
         super().__init__(coordinator)
@@ -81,6 +82,12 @@ class SchoolMenuSensor(CoordinatorEntity[SchoolMenuCoordinator], SensorEntity):
     @property
     def _target(self) -> datetime.date | None:
         return target_date(dt_util.now().date(), self._which)
+
+    @property
+    def icon(self) -> str:
+        day = self._target
+        menu = self.coordinator.menu_for(day) if day is not None else None
+        return dish_icon(menu.main if menu is not None else None)
 
     @property
     def native_value(self) -> str:
