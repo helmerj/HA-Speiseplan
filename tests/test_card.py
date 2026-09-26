@@ -97,7 +97,9 @@ async def test_a_school_day(hass: HomeAssistant, config_entry: MockConfigEntry, 
         },
         TOMORROW: {
             "primary": "Morgen · Donnerstag, 01.10.",
-            "secondary": "Blumenkohl-Brokkoli-Möhre mit Käse überbacken\nStand: 30.09.",
+            "secondary": (
+                "Blumenkohl-Brokkoli-Möhre mit Käse überbacken\nKartoffeln · Obst\nStand: 30.09."
+            ),
         },
     }
 
@@ -110,7 +112,7 @@ async def test_on_friday_the_next_school_day_is_not_called_tomorrow(
 
     assert render_card(hass)[TOMORROW] == {
         "primary": "Montag, 28.09.",
-        "secondary": "Pasta mit Tomaten Sauce dazu Parmesan\nStand: 25.09.",
+        "secondary": "Pasta mit Tomaten Sauce dazu Parmesan\nBlattsalat · Obst\nStand: 25.09.",
     }
 
 
@@ -124,7 +126,7 @@ async def test_on_sunday_monday_is_tomorrow(
         TODAY: {"primary": "Heute · Sonntag, 27.09.", "secondary": "Kein Mittagessen"},
         TOMORROW: {
             "primary": "Morgen · Montag, 28.09.",
-            "secondary": "Pasta mit Tomaten Sauce dazu Parmesan\nStand: 27.09.",
+            "secondary": "Pasta mit Tomaten Sauce dazu Parmesan\nBlattsalat · Obst\nStand: 27.09.",
         },
     }
 
@@ -209,7 +211,9 @@ async def test_the_stand_line_uses_the_local_date(
     freezer.move_to("2026-09-28 01:30:00+02:00")
     await _loaded(hass, config_entry, _week())
 
-    assert render_card(hass)[TOMORROW]["secondary"] == "Kartoffel Gratin\nStand: 28.09."
+    assert render_card(hass)[TOMORROW]["secondary"] == (
+        "Kartoffel Gratin\nRotebeete-Apfel Salat · Erdbeere Joghurt\nStand: 28.09."
+    )
 
 
 async def test_before_any_import_the_stand_line_says_so(
@@ -255,3 +259,24 @@ async def test_the_one_line_titles_stay_short_enough_for_a_400px_tile(
 
     for tile in render_card(hass).values():
         assert len(tile["primary"]) <= 28, tile["primary"]
+
+
+async def test_a_one_line_next_school_day_renders_no_empty_line(
+    hass: HomeAssistant, config_entry: MockConfigEntry, freezer
+) -> None:
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    await _loaded(hass, config_entry, _week({"2026-10-01": ("Suppe",)}))
+
+    assert render_card(hass)[TOMORROW]["secondary"] == "Suppe\nStand: 30.09."
+
+
+async def test_every_line_of_the_next_school_day_is_shown(
+    hass: HomeAssistant, config_entry: MockConfigEntry, freezer
+) -> None:
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    five = ("Eintopf", "Brot", "Salat", "Obst", "Tee")
+    await _loaded(hass, config_entry, _week({"2026-10-01": five}))
+
+    assert render_card(hass)[TOMORROW]["secondary"] == (
+        "Eintopf\nBrot · Salat · Obst · Tee\nStand: 30.09."
+    )

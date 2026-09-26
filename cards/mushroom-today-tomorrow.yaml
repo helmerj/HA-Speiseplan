@@ -37,12 +37,15 @@ cards:
       {%- endif -%}
     secondary: |-
       {%- set e = 'sensor.school_menu_next_school_day' -%}
-      {%- set main = state_attr(e, 'main') -%}
+      {%- set lines = state_attr(e, 'lines') or [] -%}
       {%- set stand = as_datetime(states('sensor.school_menu_last_import'), None) -%}
       {%- if states(e) in ['unavailable', 'unknown'] -%}
       Speiseplan nicht verfügbar
       {%- else -%}
-      {{ main if main else 'Kein Mittagessen' }}
+      {{ lines[0] if lines else 'Kein Mittagessen' }}
+      {%- if lines[1:] %}
+      {{ lines[1:] | join(' · ') }}
+      {%- endif %}
       Stand: {{ as_local(stand).strftime('%d.%m.') if stand else 'noch kein Import' }}
       {%- endif -%}
     multiline_secondary: true

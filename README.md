@@ -95,12 +95,15 @@ cards:
       {%- endif -%}
     secondary: |-
       {%- set e = 'sensor.school_menu_next_school_day' -%}
-      {%- set main = state_attr(e, 'main') -%}
+      {%- set lines = state_attr(e, 'lines') or [] -%}
       {%- set stand = as_datetime(states('sensor.school_menu_last_import'), None) -%}
       {%- if states(e) in ['unavailable', 'unknown'] -%}
       Speiseplan nicht verfügbar
       {%- else -%}
-      {{ main if main else 'Kein Mittagessen' }}
+      {{ lines[0] if lines else 'Kein Mittagessen' }}
+      {%- if lines[1:] %}
+      {{ lines[1:] | join(' · ') }}
+      {%- endif %}
       Stand: {{ as_local(stand).strftime('%d.%m.') if stand else 'noch kein Import' }}
       {%- endif -%}
     multiline_secondary: true
@@ -114,7 +117,7 @@ no editing, and theme variables only, so light and dark mode follow your theme.
 | Tile | Title line | Text (wraps, so long dishes are never cut off) |
 |---|---|---|
 | Today | `Heute · Mittwoch, 30.09.` | the main course, then every further line of the day joined by ` · ` |
-| Next school day | `Morgen · Donnerstag, 01.10.` — on Fri and Sat just `Montag, 05.10.` | its main course, then `Stand: <date of the last import>` |
+| Next school day | `Morgen · Donnerstag, 01.10.` — on Fri and Sat just `Montag, 05.10.` | its main course, then every further line joined by ` · `, then `Stand: <date of the last import>` |
 
 On weekends, holidays and days without a menu the text reads **Kein Mittagessen**. If the
 integration itself is not running, it reads **Speiseplan nicht verfügbar** instead, so a broken

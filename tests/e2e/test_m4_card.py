@@ -48,7 +48,10 @@ async def test_the_documented_card_follows_the_week_from_sunday_to_wednesday(
     assert sunday[TODAY] == {"primary": "Heute · Sonntag, 27.09.", "secondary": "Kein Mittagessen"}
     assert sunday[TOMORROW] == {
         "primary": "Morgen · Montag, 28.09.",
-        "secondary": "Pasta mit Tomaten Sauce dazu Parmesan\nStand: 27.09.",
+        "secondary": (
+            "Pasta mit Tomaten Sauce dazu Parmesan\n"
+            "Blattsalat mit gerösteten Kernen · Obst\nStand: 27.09."
+        ),
     }
 
     freezer.move_to("2026-09-30 00:00:00+02:00")
@@ -62,7 +65,9 @@ async def test_the_documented_card_follows_the_week_from_sunday_to_wednesday(
     }
     assert wednesday[TOMORROW] == {
         "primary": "Morgen · Donnerstag, 01.10.",
-        "secondary": "Blumenkohl-Brokkoli-Möhre mit Käse überbacken\nStand: 27.09.",
+        "secondary": (
+            "Blumenkohl-Brokkoli-Möhre mit Käse überbacken\nKartoffeln · Obst\nStand: 27.09."
+        ),
     }
     for text in (card_text(hass), str(sunday)):
         assert not re.search(r"(?<![\w-])none(?![\w-])", text, re.IGNORECASE)

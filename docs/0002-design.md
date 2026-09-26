@@ -699,3 +699,8 @@ hand — acceptable pre-release, with one known test install.
   Before this, deleting and re-adding the integration (as the entity-id fix requires) left the old
   week file behind for ever.
 
+**Amendment 2026-09-26 — the next-school-day tile shows every line.** The §9 card table gave the
+next-school-day tile the main course only. On the live dashboard that read as data loss ("Blattsalat
+mit gerösteten Kernen" and "Obst" missing for Monday, although both are stored). The tile now renders
+like today's: the main, then every further line joined by ` · `, then `Stand: <TT.MM.>`.
+
