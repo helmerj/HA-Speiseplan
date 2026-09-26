@@ -29,6 +29,7 @@ from .coordinator import SchoolMenuCoordinator
 from .imap_client import create_client
 from .models import MenuParseError, ParsedWeek
 from .parser import extract_lines, parse_lines
+from .store import MenuStore
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -190,6 +191,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(async_track_time_change(hass, _at_midnight, hour=0, minute=0, second=0))
     entry.async_on_unload(hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, _on_core_config))
     return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    await MenuStore(hass, entry.entry_id).async_remove()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

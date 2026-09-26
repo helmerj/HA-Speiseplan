@@ -286,3 +286,53 @@ async def test_a_poll_that_outlives_its_deadline_is_a_transient_failure(
         await _fail(coordinator, 1)
 
     assert coordinator.consecutive_failures == 1
+
+
+async def test_a_rejected_login_logs_the_servers_reason(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer, caplog
+) -> None:
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer([])
+    coordinator = await setup_mailbox(hass, mail_entry, server)
+    server.login_result = "NO"
+    server.login_lines = [b"[AUTHENTICATIONFAILED] Invalid credentials (Failure)"]
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert "Invalid credentials" in caplog.text
+
+
+async def test_a_server_that_echoes_credentials_has_them_masked(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer, caplog
+) -> None:
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer([])
+    coordinator = await setup_mailbox(hass, mail_entry, server)
+    server.login_result = "NO"
+    server.login_lines = [
+        f"login {MAILBOX['username']} with {MAILBOX['password']} refused {'x' * 400}".encode()
+    ]
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    assert "refused" in caplog.text
+    assert "***" in caplog.text
+    assert MAILBOX["password"] not in caplog.text
+    assert MAILBOX["username"] not in caplog.text
+    assert "x" * 250 not in caplog.text
+
+
+async def test_a_transient_login_failure_names_the_reason_in_the_notification(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer([])
+    coordinator = await setup_mailbox(hass, mail_entry, server)
+    server.login_result = "NO"
+    server.login_lines = [b"[UNAVAILABLE] Temporary System Problem"]
+
+    await _fail(coordinator, 3)
+
+    assert "Temporary System Problem" in _notifications(hass)[NOTIFICATION_IMAP_ID]["message"]

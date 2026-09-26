@@ -688,3 +688,14 @@ sensor is now `sensor.school_menu_next_school_day`, friendly name "Next school d
 before the rename keep an orphaned `sensor.school_menu_tomorrow` in the registry, to be removed by
 hand — acceptable pre-release, with one known test install.
 
+**Amendment 2026-09-26 — from the first live Gmail run.**
+
+- **A rejected LOGIN names the server's reason.** Gmail answered a mistyped app password with
+  `NO [AUTHENTICATIONFAILED] Invalid credentials (Failure)`, but the log said only `NO`, which left the
+  operator guessing. `ImapAuthError` / `ImapTransportError` now carry the server's response text,
+  truncated to 200 characters, with the configured username and password replaced by `***` in case a
+  server echoes them. §7's "credentials never appear in logs" still holds.
+- **Removing the entry removes its store.** `async_remove_entry` deletes `.storage/school_menu.<entry_id>`.
+  Before this, deleting and re-adding the integration (as the entity-id fix requires) left the old
+  week file behind for ever.
+

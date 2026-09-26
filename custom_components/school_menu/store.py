@@ -52,6 +52,9 @@ class MenuStore:
         await self._store.async_save({"weeks": self.weeks})
         return key in self.weeks
 
+    async def async_remove(self) -> None:
+        await self._store.async_remove()
+
     def knows_hash(self, content_hash: str) -> bool:
         return any(
             content_hash in record.get("content_hashes", []) for record in self.weeks.values()

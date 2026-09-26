@@ -25,6 +25,7 @@ HEADER_FETCH = "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])"
 BODY_FETCH = "(BODY.PEEK[])"
 UIDVALIDITY = re.compile(r"\[UIDVALIDITY (\d+)\]", re.IGNORECASE)
 UNAVAILABLE = "[UNAVAILABLE]"
+REASON_MAX_LENGTH = 200
 
 
 class ImapResponse(Protocol):
@@ -188,14 +189,23 @@ def _uid_validity(lines: list) -> str | None:
     return None
 
 
-def _login_failure(response: ImapResponse) -> Exception:
+def _server_reason(response: ImapResponse, settings: ImapSettings) -> str:
     detail = " ".join(
         line.decode(errors="replace") if isinstance(line, bytes | bytearray) else str(line)
         for line in response.lines or []
     )
-    if response.result == "NO" and UNAVAILABLE not in detail.upper():
-        return ImapAuthError(response.result)
-    return ImapTransportError(f"LOGIN: {response.result}")
+    for secret in (settings.password, settings.username):
+        if secret:
+            detail = detail.replace(secret, "***")
+    return detail.strip()[:REASON_MAX_LENGTH]
+
+
+def _login_failure(response: ImapResponse, settings: ImapSettings) -> Exception:
+    reason = _server_reason(response, settings)
+    message = f"LOGIN {response.result}: {reason}" if reason else f"LOGIN {response.result}"
+    if response.result == "NO" and UNAVAILABLE not in reason.upper():
+        return ImapAuthError(message)
+    return ImapTransportError(message)
 
 
 def sender_addresses(raw_from: str) -> set[str]:
@@ -245,7 +255,7 @@ async def _async_collect(
 
     response = await client.login(settings.username, settings.password)
     if response.result != "OK":
-        raise _login_failure(response)
+        raise _login_failure(response, settings)
 
     opened = await client.examine(settings.folder)
     if opened.result != "OK":
