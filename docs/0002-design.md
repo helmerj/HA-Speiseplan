@@ -707,3 +707,12 @@ like today's: the main, then every further line joined by ` · `, then `Stand: <
 **Amendment 2026-09-26 — card header.** The card opens with a `custom:mushroom-title-card` reading
 "AHS Speiseplan" (operator request), above the today and next-school-day tiles.
 
+**Amendment 2026-09-26 — dish icons.** A new pure module `icons.py` (no Home Assistant imports, like
+`parser.py`) maps the main course to a Material Design icon: an ordered keyword table, matched as
+case-insensitive substrings so German compounds ("Tomatensuppe") match, and the first row that
+matches wins. Specific dishes come before ingredients, so "Pasta mit Käse" is pasta rather than cheese.
+Anything unmatched, and every day without a menu, keeps the neutral `mdi:food`. The menu sensors
+expose it as their `icon`, and the card's template tiles read it via `state_attr(e, 'icon')`, so it
+changes everywhere, not only on the card. Very short, ambiguous keywords (`ei`, `mais` as a bare word)
+are deliberately left out: "ei" would match "Reis" and "Brei".
+

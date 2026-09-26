@@ -4,7 +4,7 @@ cards:
     title: AHS Speiseplan
   - type: custom:mushroom-template-card
     entity: sensor.school_menu_today
-    icon: mdi:food
+    icon: "{{ state_attr('sensor.school_menu_today', 'icon') or 'mdi:food' }}"
     primary: |-
       {%- set e = 'sensor.school_menu_today' -%}
       {%- set d = state_attr(e, 'date') -%}
@@ -25,7 +25,7 @@ cards:
       action: more-info
   - type: custom:mushroom-template-card
     entity: sensor.school_menu_next_school_day
-    icon: mdi:food-fork-drink
+    icon: "{{ state_attr('sensor.school_menu_next_school_day', 'icon') or 'mdi:food' }}"
     primary: |-
       {%- set e = 'sensor.school_menu_next_school_day' -%}
       {%- set d = state_attr(e, 'date') -%}
