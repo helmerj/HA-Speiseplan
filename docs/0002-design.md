@@ -388,6 +388,14 @@ A **fixed** unique id plus `_abort_if_unique_id_configured` enforces **exactly o
 (§10 R2). Entity ids therefore stay `sensor.school_menu_today` / `_next_school_day` / `_last_import`, and the
 documented card YAML is copy-pasteable with no placeholders.
 
+**Amendment 2026-09-26 — entity ids are pinned explicitly.** The single-entry rule alone does not fix
+the ids: Home Assistant derives them from the device name, i.e. the entry *title*, which the user
+types in the config flow. The first live install was titled "AHS Speiseplan" and got
+`sensor.ahs_speiseplan_*`, so the documented card showed "Speiseplan nicht verfügbar". Each entity
+therefore sets `entity_id = sensor.school_menu_<key>` before registration. HA only honours that for a
+new registry entry; an existing install keeps its ids until the entry is re-added or the ids are
+renamed in the UI.
+
 **M2 options flow** — `OptionsFlowWithReload`, step `init`:
 
 | Field | Default | Notes |

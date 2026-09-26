@@ -27,6 +27,11 @@ list, `weekday`, `date`, `source_file` and `ingested_at`.
 
 Only one entry is supported; a second attempt is refused by design.
 
+The entity ids are always `sensor.school_menu_today`, `sensor.school_menu_next_school_day` and
+`sensor.school_menu_last_import`, whatever you name the entry, so the card below works unedited.
+(Entries created with version 0.1.0 before this fix may carry ids derived from the entry name; delete
+and re-add the integration, or rename the three entities, to get the fixed ids.)
+
 ## Mailbox (automatic import)
 
 School Menu → **Configure** asks for the IMAP host, port, SSL, username, password, folder, the

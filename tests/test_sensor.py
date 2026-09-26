@@ -227,3 +227,33 @@ async def test_the_second_menu_sensor_is_named_for_the_next_school_day(
         registry.async_get_entity_id("sensor", DOMAIN, f"{config_entry.entry_id}_tomorrow") is None
     )
     assert hass.states.get("sensor.school_menu_tomorrow") is None
+
+
+async def test_entity_ids_stay_fixed_whatever_the_entry_is_called(
+    hass: HomeAssistant, freezer
+) -> None:
+    from homeassistant.helpers import area_registry as ar
+    from homeassistant.helpers import device_registry as dr
+
+    from custom_components.school_menu.const import SINGLE_ENTRY_UNIQUE_ID
+
+    freezer.move_to("2026-09-28 10:00:00+02:00")
+    entry = MockConfigEntry(
+        domain=DOMAIN, unique_id=SINGLE_ENTRY_UNIQUE_ID, title="AHS Speiseplan", data={}
+    )
+    await _setup_with_week_40(hass, entry)
+    kitchen = ar.async_get(hass).async_create("Küche")
+    devices = dr.async_get(hass)
+    device = dr.async_entries_for_config_entry(devices, entry.entry_id)[0]
+    devices.async_update_device(device.id, area_id=kitchen.id)
+
+    ids = sorted(state.entity_id for state in hass.states.async_all("sensor"))
+
+    assert ids == [
+        "sensor.school_menu_last_import",
+        "sensor.school_menu_next_school_day",
+        "sensor.school_menu_today",
+    ]
+    assert hass.states.get("sensor.school_menu_today").state == (
+        "Pasta mit Tomaten Sauce dazu Parmesan"
+    )

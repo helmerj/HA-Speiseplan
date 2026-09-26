@@ -71,6 +71,7 @@ class SchoolMenuSensor(CoordinatorEntity[SchoolMenuCoordinator], SensorEntity):
         self._which = which
         self._attr_name = SENSOR_NAMES[which]
         self._attr_unique_id = f"{entry.entry_id}_{which}"
+        self.entity_id = f"sensor.{DOMAIN}_{which}"
         self._attr_device_info = _device(entry)
 
     @property
@@ -134,6 +135,7 @@ class LastImportSensor(CoordinatorEntity[SchoolMenuCoordinator], SensorEntity):
         super().__init__(coordinator)
         self._attr_name = "Last import"
         self._attr_unique_id = f"{entry.entry_id}_{SENSOR_LAST_IMPORT}"
+        self.entity_id = f"sensor.{DOMAIN}_{SENSOR_LAST_IMPORT}"
         self._attr_device_info = _device(entry)
 
     @property
