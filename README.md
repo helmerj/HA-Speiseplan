@@ -8,6 +8,7 @@ Assistant sensors, so today's lunch and the next school day's are on the dashboa
 | `sensor.school_menu_today` | Today's main course; `none` with `reason: weekend \| no_menu` when there is no lunch |
 | `sensor.school_menu_next_school_day` | The next school day's main course — Fri, Sat and Sun all resolve to Monday; the `weekday` and `date` attributes say which day it is |
 | `sensor.school_menu_last_import` | Timestamp of the most recent accepted import (diagnostic) |
+| `button.school_menu_check_mail` | Checks the mailbox right away ("Check mail now" / "Speiseplan jetzt abrufen") |
 
 Each menu sensor also exposes `main`, `side`, `dessert` (positional, not semantic), the full `lines`
 list, `weekday`, `date`, `source_file` and `ingested_at`.
@@ -35,12 +36,24 @@ and re-add the integration, or rename the three entities, to get the fixed ids.)
 ## Mailbox (automatic import)
 
 School Menu → **Configure** asks for the IMAP host, port, SSL, username, password, folder, the
-sender addresses (both class teachers by default), the subject filter (`Speiseplan KW`) and the poll
-interval (15 min, minimum 5). A mail is imported only when **both** a configured sender and the
-subject filter match.
+senders, the subject filter and the poll interval. A mail is imported when **all three** hold:
+
+- it comes from a configured sender — by default **anyone at `@annie-heuser.schule`**; an entry can
+  be a full address or `@domain`, and only the real address counts, never the display name;
+- its subject contains the filter text — by default **`Speiseplan`**, in any case;
+- it has a **PDF attachment**.
+
+The mailbox is checked every **15 minutes** by default (5–1440, same form). For an immediate check,
+press **Check mail now** (`button.school_menu_check_mail`, German: "Speiseplan jetzt abrufen") or
+call the action `school_menu.check_mail`. It re-reads all school mails of the last 14 days, retries
+attachments that were refused before, and still never imports a menu twice.
+
+Installations from v0.1.0 that still have the old defaults (the two class teachers, `Speiseplan KW`)
+are switched to the new defaults automatically on update; customised values are kept.
 
 - The mailbox is opened **read-only**: messages are never marked read, moved or deleted.
-- The second teacher's copy of the same week changes nothing — no second import, no new timestamp.
+- Another copy of the same week, from a second sender or resent, changes nothing — no second
+  import, no new timestamp.
 - A mail that would replace a stored week with fewer days is refused and reported once per Home
   Assistant start; import the file by hand (`school_menu.import_pdf`) if the shorter week is
   genuinely correct. An unreadable attachment is reported the same way.

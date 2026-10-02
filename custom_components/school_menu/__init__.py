@@ -18,10 +18,17 @@ from homeassistant.helpers.typing import ConfigType
 from .const import (
     CONF_FILE_ID,
     CONF_FILE_PATH,
+    CONF_SENDERS,
+    CONF_SUBJECT_FILTER,
     CONF_WEEK_START,
+    DEFAULT_SENDERS,
+    DEFAULT_SUBJECT_FILTER,
     DOMAIN,
+    LEGACY_DEFAULT_SENDERS,
+    LEGACY_DEFAULT_SUBJECT_FILTER,
     NOTIFICATION_ERROR_ID,
     NOTIFICATION_OK_ID,
+    SERVICE_CHECK_MAIL,
     SERVICE_IMPORT_PDF,
     SOURCE_MANUAL,
 )
@@ -33,7 +40,7 @@ from .store import MenuStore
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BUTTON]
 
 IMPORT_PDF_SCHEMA = vol.Schema(
     {
@@ -163,6 +170,16 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     hass.services.async_register(
         DOMAIN, SERVICE_IMPORT_PDF, _handle_import_pdf, schema=IMPORT_PDF_SCHEMA
     )
+
+    async def _handle_check_mail(call: ServiceCall) -> None:
+        coordinator = _single_coordinator(hass)
+        if not coordinator.mailbox_configured:
+            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_mailbox")
+        await coordinator.async_check_mail_now()
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_CHECK_MAIL, _handle_check_mail, schema=vol.Schema({})
+    )
     return True
 
 
@@ -190,6 +207,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(async_track_time_change(hass, _at_midnight, hour=0, minute=0, second=0))
     entry.async_on_unload(hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, _on_core_config))
+    return True
+
+
+def _is_legacy_sender_default(senders: object) -> bool:
+    if not isinstance(senders, list):
+        return False
+    normalised = sorted(str(sender).strip().lower() for sender in senders)
+    return normalised == sorted(sender.lower() for sender in LEGACY_DEFAULT_SENDERS)
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    if entry.version > 1:
+        return False
+    if entry.minor_version < 2:
+        data = dict(entry.data)
+        if _is_legacy_sender_default(data.get(CONF_SENDERS)):
+            data[CONF_SENDERS] = list(DEFAULT_SENDERS)
+        if data.get(CONF_SUBJECT_FILTER) == LEGACY_DEFAULT_SUBJECT_FILTER:
+            data[CONF_SUBJECT_FILTER] = DEFAULT_SUBJECT_FILTER
+        hass.config_entries.async_update_entry(entry, data=data, minor_version=2)
     return True
 
 

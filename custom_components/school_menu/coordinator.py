@@ -133,6 +133,15 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
             attachment.message_key for attachment in attachments if attachment.message_key
         )
 
+    @property
+    def mailbox_configured(self) -> bool:
+        return imap_settings(self.config_entry) is not None
+
+    async def async_check_mail_now(self) -> None:
+        self.seen_messages.clear()
+        self.rejected_hashes.clear()
+        await self.async_refresh()
+
     def _reject(self, filename: str, content_hash: str, reason: str) -> None:
         self.rejected_hashes.add(content_hash)
         _LOGGER.warning("Not importing %s from the mailbox: %s", filename, reason)

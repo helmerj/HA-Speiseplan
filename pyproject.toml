@@ -17,6 +17,7 @@ markers = [
     "m2: milestone 2 acceptance",
     "m3: milestone 3 acceptance",
     "m4: milestone 4 acceptance",
+    "m5: any school sender and manual mail check (HAS-1) acceptance",
 ]
 
 [tool.coverage.run]

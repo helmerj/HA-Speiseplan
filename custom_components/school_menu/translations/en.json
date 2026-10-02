@@ -36,6 +36,9 @@
     },
     "upload_not_found": {
       "message": "That upload is no longer available. Upload the PDF again."
+    },
+    "no_mailbox": {
+      "message": "No mailbox is configured. Set one up under School Menu → Configure first."
     }
   },
   "services": {
@@ -56,6 +59,10 @@
           "description": "Monday of the week the PDF covers. Only used when the PDF header has no readable date range."
         }
       }
+    },
+    "check_mail": {
+      "name": "Check mail now",
+      "description": "Checks the configured mailbox right away and re-reads every school mail of the last 14 days, including attachments that were refused before. Menus already stored are not imported twice."
     }
   },
   "options": {
@@ -69,18 +76,30 @@
           "username": "Username",
           "password": "Password",
           "folder": "Folder",
-          "senders": "Sender addresses",
+          "senders": "Senders",
           "subject_filter": "Subject contains",
           "scan_interval_minutes": "Scan interval (minutes)"
+        },
+        "data_description": {
+          "senders": "Who may send the menu. A full address, or @domain for everyone at that domain (default: @annie-heuser.schule).",
+          "subject_filter": "A mail counts only if its subject contains this text (any case) and it has a PDF attachment.",
+          "scan_interval_minutes": "How often the mailbox is checked, 5–1440 minutes. Use the 'Check mail now' button for an immediate check."
         }
       }
     },
     "error": {
-      "no_senders": "Add at least one sender address.",
+      "no_senders": "Add at least one sender address or @domain.",
       "no_password": "Enter the mailbox password.",
       "no_host": "Enter the IMAP server host name.",
-      "invalid_sender": "Every sender must be a single e-mail address.",
+      "invalid_sender": "Every sender must be a single e-mail address or @domain, e.g. @annie-heuser.schule.",
       "no_subject_filter": "Enter a subject filter; an empty filter would match every mail."
+    }
+  },
+  "entity": {
+    "button": {
+      "check_mail": {
+        "name": "Check mail now"
+      }
     }
   }
 }

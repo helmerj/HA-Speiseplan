@@ -47,5 +47,9 @@ def mail_entry() -> MockConfigEntry:
     from tests.fake_imap import MAILBOX
 
     return MockConfigEntry(
-        domain=DOMAIN, unique_id=SINGLE_ENTRY_UNIQUE_ID, title="School menu", data=dict(MAILBOX)
+        domain=DOMAIN,
+        unique_id=SINGLE_ENTRY_UNIQUE_ID,
+        title="School menu",
+        minor_version=2,
+        data=dict(MAILBOX),
     )

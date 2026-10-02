@@ -36,6 +36,8 @@ GERMAN_WEEKDAYS = (
 )
 
 SERVICE_IMPORT_PDF = "import_pdf"
+SERVICE_CHECK_MAIL = "check_mail"
+BUTTON_CHECK_MAIL = "check_mail"
 CONF_FILE_PATH = "file_path"
 CONF_FILE_ID = "file_id"
 CONF_WEEK_START = "week_start"
@@ -59,8 +61,10 @@ CONF_SCAN_INTERVAL_MINUTES = "scan_interval_minutes"
 DEFAULT_PORT = 993
 DEFAULT_SSL = True
 DEFAULT_FOLDER = "INBOX"
-DEFAULT_SUBJECT_FILTER = "Speiseplan KW"
-DEFAULT_SENDERS = (
+DEFAULT_SUBJECT_FILTER = "Speiseplan"
+DEFAULT_SENDERS = ("@annie-heuser.schule",)
+LEGACY_DEFAULT_SUBJECT_FILTER = "Speiseplan KW"
+LEGACY_DEFAULT_SENDERS = (
     "Maximilian.Stollberg@annie-heuser.schule",
     "Lena.Putzmann@annie-heuser.schule",
 )

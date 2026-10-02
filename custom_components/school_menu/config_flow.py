@@ -47,6 +47,7 @@ from .const import (
 )
 
 EMAIL_ADDRESS = re.compile(r"[^@\s\"<>,;]+@[^@\s\"<>,;]+\.[^@\s\"<>,;]+")
+EMAIL_DOMAIN = re.compile(r"@[^@\s\"<>,;]+\.[^@\s\"<>,;]+")
 
 STEP_USER_SCHEMA = vol.Schema({vol.Optional(CONF_NAME, default=DEFAULT_NAME): str})
 
@@ -104,7 +105,10 @@ def _errors(cleaned: dict[str, Any]) -> dict[str, str]:
         return {CONF_HOST: "no_host"}
     if not cleaned[CONF_SENDERS]:
         return {CONF_SENDERS: "no_senders"}
-    if not all(EMAIL_ADDRESS.fullmatch(sender) for sender in cleaned[CONF_SENDERS]):
+    if not all(
+        EMAIL_ADDRESS.fullmatch(sender) or EMAIL_DOMAIN.fullmatch(sender)
+        for sender in cleaned[CONF_SENDERS]
+    ):
         return {CONF_SENDERS: "invalid_sender"}
     if not cleaned[CONF_SUBJECT_FILTER]:
         return {CONF_SUBJECT_FILTER: "no_subject_filter"}
@@ -115,6 +119,7 @@ def _errors(cleaned: dict[str, Any]) -> dict[str, str]:
 
 class SchoolMenuConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
+    MINOR_VERSION = 2
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         await self.async_set_unique_id(SINGLE_ENTRY_UNIQUE_ID)
