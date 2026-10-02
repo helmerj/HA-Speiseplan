@@ -174,10 +174,12 @@ async def test_a_failed_check_is_reported_not_swallowed(
     assert "hunter2" not in str(raised.value.translation_placeholders)
 
 
-async def test_a_second_check_within_a_minute_is_skipped(
+async def test_a_second_check_within_a_minute_is_skipped_and_says_so(
     hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
 ) -> None:
     import datetime
+
+    from homeassistant.exceptions import HomeAssistantError
 
     freezer.move_to("2026-09-30 09:00:00+02:00")
     server = FakeImapServer([])
@@ -185,12 +187,36 @@ async def test_a_second_check_within_a_minute_is_skipped(
     server.commands.clear()
 
     await _check(hass)
-    await _press(hass)
+    freezer.tick(datetime.timedelta(seconds=59))
+    with pytest.raises(HomeAssistantError) as raised:
+        await _press(hass)
+    assert raised.value.translation_key == "check_mail_skipped"
     assert _logins(server) == 1
 
-    freezer.tick(datetime.timedelta(seconds=61))
+    freezer.tick(datetime.timedelta(seconds=1))
     await _press(hass)
     assert _logins(server) == 2
+
+
+async def test_a_retry_right_after_a_failed_check_polls_again(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    from homeassistant.exceptions import HomeAssistantError
+
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer([])
+    await setup_mailbox(hass, mail_entry, server)
+    server.select_result = "NO"
+    with pytest.raises(HomeAssistantError):
+        await _check(hass)
+    server.select_result = "OK"
+    server.messages = [mail("1", TEACHER_A, "Speiseplan KW40", pdf())]
+    server.commands.clear()
+
+    await _check(hass)
+
+    assert _logins(server) == 1
+    assert hass.states.get("sensor.school_menu_today").state == "Chili sin Carne mit Sauer Sahne"
 
 
 async def test_two_checks_at_once_open_one_session(
@@ -203,9 +229,16 @@ async def test_two_checks_at_once_open_one_session(
     coordinator = await setup_mailbox(hass, mail_entry, server)
     server.commands.clear()
 
-    await asyncio.gather(coordinator.async_check_mail_now(), coordinator.async_check_mail_now())
+    results = await asyncio.gather(
+        coordinator.async_check_mail_now(),
+        coordinator.async_check_mail_now(),
+        return_exceptions=True,
+    )
 
     assert _logins(server) == 1
+    skipped = [r for r in results if r is not None]
+    assert len(skipped) == 1
+    assert skipped[0].translation_key == "check_mail_skipped"
 
 
 async def test_a_check_during_a_running_poll_is_skipped(
@@ -216,9 +249,13 @@ async def test_a_check_during_a_running_poll_is_skipped(
     coordinator = await setup_mailbox(hass, mail_entry, server)
     server.commands.clear()
 
-    async with coordinator.poll_lock:
-        await coordinator.async_check_mail_now()
+    from homeassistant.exceptions import HomeAssistantError
 
+    async with coordinator.poll_lock:
+        with pytest.raises(HomeAssistantError) as raised:
+            await coordinator.async_check_mail_now()
+
+    assert raised.value.translation_key == "check_mail_skipped"
     assert _logins(server) == 0
 
 
@@ -240,3 +277,29 @@ async def test_a_scheduled_poll_waits_while_a_check_holds_the_mailbox(
     await task
 
     assert _logins(server) == 1
+
+
+async def test_a_check_that_has_not_reached_the_mailbox_yet_still_blocks_a_second_one(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    import asyncio
+
+    from homeassistant.exceptions import HomeAssistantError
+
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    coordinator = await setup_mailbox(hass, mail_entry, FakeImapServer([]))
+    release = asyncio.Event()
+
+    async def _slow_refresh() -> None:
+        await release.wait()
+
+    with patch.object(coordinator, "async_refresh", _slow_refresh):
+        first = hass.async_create_task(coordinator.async_check_mail_now())
+        await asyncio.sleep(0)
+        assert not coordinator.poll_lock.locked()
+        with pytest.raises(HomeAssistantError) as raised:
+            await coordinator.async_check_mail_now()
+        release.set()
+        await first
+
+    assert raised.value.translation_key == "check_mail_skipped"

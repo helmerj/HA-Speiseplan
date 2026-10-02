@@ -99,6 +99,7 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
         self.seen_messages: set[str] = set()
         self.poll_lock = asyncio.Lock()
         self._last_forced_check: datetime.datetime | None = None
+        self._check_running = False
 
     async def async_initialise(self) -> None:
         await self.store.async_load()
@@ -144,21 +145,28 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
     async def async_check_mail_now(self) -> None:
         now = dt_util.utcnow()
         last = self._last_forced_check
-        if self.poll_lock.locked() or (
-            last is not None and (now - last).total_seconds() < CHECK_MAIL_COOLDOWN_SECONDS
+        if (
+            self._check_running
+            or self.poll_lock.locked()
+            or (last is not None and (now - last).total_seconds() < CHECK_MAIL_COOLDOWN_SECONDS)
         ):
-            _LOGGER.info("Skipping a forced mail check: one ran or is running just now")
-            return
-        self._last_forced_check = now
-        self.seen_messages.clear()
-        self.rejected_hashes.clear()
-        await self.async_refresh()
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="check_mail_skipped"
+            )
+        self._check_running = True
+        try:
+            self.seen_messages.clear()
+            self.rejected_hashes.clear()
+            await self.async_refresh()
+        finally:
+            self._check_running = False
         if not self.last_update_success:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="check_mail_failed",
                 translation_placeholders={"reason": str(self.last_exception or "unknown")},
             )
+        self._last_forced_check = now
 
     def _reject(self, filename: str, content_hash: str, reason: str) -> None:
         self.rejected_hashes.add(content_hash)

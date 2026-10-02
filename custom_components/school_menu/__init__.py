@@ -42,6 +42,8 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BUTTON]
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 IMPORT_PDF_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_FILE_PATH): cv.string,

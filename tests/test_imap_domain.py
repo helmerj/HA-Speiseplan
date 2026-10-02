@@ -77,6 +77,24 @@ def test_look_alikes_of_the_school_domain_are_rejected(raw_from: str) -> None:
     assert sender_allowed(raw_from, [SCHOOL]) is False
 
 
+@pytest.mark.parametrize(
+    "raw_from",
+    [
+        '"Maximilian Stollberg"\r\n <Maximilian.Stollberg@annie-heuser.schule>',
+        "Maximilian Stollberg Klassenlehrer der Klasse 3b\n <x@annie-heuser.schule>",
+        "=?utf-8?q?Sekretariat_K=C3=BCche_der_Annie-Heuser-Schule_Berlin?=\r\n\t<k@annie-heuser.schule>",
+        "A <x@annie-heuser.schule>\r\n",
+        "<X@ANNIE-HEUSER.SCHULE>",
+    ],
+)
+def test_folded_or_trailing_crlf_from_headers_are_accepted(raw_from: str) -> None:
+    assert sender_allowed(raw_from, [SCHOOL]) is True
+
+
+def test_a_header_the_parser_rejects_counts_as_no_sender() -> None:
+    assert sender_allowed('"Name\r\nX" <x@annie-heuser.schule>', [SCHOOL]) is False
+
+
 def test_full_addresses_still_match_exactly() -> None:
     assert sender_allowed(f"Herr Stollberg <{TEACHER_A}>", [TEACHER_A]) is True
     assert sender_allowed(f"Frau Meier <{KITCHEN_OFFICE}>", [TEACHER_A]) is False
@@ -167,3 +185,23 @@ async def test_a_stranger_with_speiseplan_and_a_pdf_is_ignored(
     coordinator = await setup_mailbox(hass, school_entry, server)
 
     assert coordinator.store.weeks == {}
+
+
+async def test_a_long_umlaut_sender_name_folded_by_the_mail_server_is_imported(
+    hass: HomeAssistant, school_entry: MockConfigEntry, freezer
+) -> None:
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    long_name = FakeMessage(
+        uid="1",
+        sender=(
+            f"Sekretariat Küche der Annie-Heuser-Schule Berlin-Charlottenburg <{KITCHEN_OFFICE}>"
+        ),
+        subject="Speiseplan für nächste Woche",
+        date="Sun, 27 Sep 2026 18:04:11 +0200",
+        attachments=[("AHS Speiseplan 26-40.pdf", pdf())],
+    )
+    assert b"\n " in long_name.as_bytes().split(b"Subject:")[0]
+
+    await setup_mailbox(hass, school_entry, FakeImapServer([long_name]))
+
+    assert hass.states.get(TODAY).state == "Chili sin Carne mit Sauer Sahne"

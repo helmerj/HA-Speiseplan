@@ -767,3 +767,20 @@ different subject. Plan: `docs/plans/school-domain-senders.md`.
 - **Rollback to v0.1.0.** v0.1.0 does not understand `@domain` entries: it would ignore all mail and
   refuse to save the options form. Before downgrading, set *Senders* back to full addresses.
 
+**Amendment 2026-10-02 (c) — HAS-2, before releasing v0.2.0.**
+
+- **Folded `From` headers.** Mail servers fold a header longer than ~78 characters onto a second
+  line (`"Name"\r\n <x@annie-heuser.schule>`); an encoded umlaut display name alone can trigger it.
+  The `From` value is unfolded (CRLF + whitespace → single line, trailing CRLF stripped) *before* it is
+  parsed. Only the parser's own errors count as "unparseable" (logged at DEBUG); anything else is a bug
+  and propagates. Round (b)'s exactly-one-address rule is unchanged.
+- **Check mail cooldown only after success.** The 60 s cooldown is stamped after a *successful* forced
+  check, so retrying right after a failure polls again. A check that is skipped — running poll or
+  within the cooldown — raises `HomeAssistantError` (`check_mail_skipped`) instead of returning as if
+  it had run; the button shows that message.
+- **Manifest requirements.** Packages Home Assistant core ships (`aioimaplib`) are declared as a
+  minimum version (`>=2.0.1`), never pinned; hassfest enforces this. The integration declares
+  `CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)` (UI-only setup).
+- **Domain entries** stay ASCII hostnames with a letters-only TLD; punycode TLDs (`xn--…`) are not
+  supported, accepted as a non-issue for a school domain.
+

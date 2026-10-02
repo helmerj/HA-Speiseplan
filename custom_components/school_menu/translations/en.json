@@ -42,6 +42,9 @@
     },
     "check_mail_failed": {
       "message": "Checking the mailbox failed: {reason}"
+    },
+    "check_mail_skipped": {
+      "message": "The mailbox was checked just now or is being checked. Try again in a minute."
     }
   },
   "services": {

@@ -204,12 +204,12 @@ async def test_the_options_flow_accepts_a_whole_school_domain(hass: HomeAssistan
     with patch("custom_components.school_menu._imap_client_factory"):
         result = await hass.config_entries.options.async_configure(
             result["flow_id"],
-            {**MAILBOX_INPUT, "senders": ["@annie-heuser.schule", "Extra@Example.org"]},
+            {**MAILBOX_INPUT, "senders": ["@Annie-Heuser.Schule", "Extra@Example.org"]},
         )
         await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.data["senders"] == ["@annie-heuser.schule", "Extra@Example.org"]
+    assert entry.data["senders"] == ["@Annie-Heuser.Schule", "Extra@Example.org"]
 
 
 async def test_the_options_form_offers_the_school_domain_by_default(hass: HomeAssistant) -> None:
