@@ -26,3 +26,10 @@ import_pdf:
       required: false
       selector:
         date: null
+
+check_mail:
+  name: Check mail now
+  description: >-
+    Checks the configured mailbox right away and re-reads every school mail of the
+    last 14 days, including attachments that were refused before. Menus already
+    stored are not imported twice.

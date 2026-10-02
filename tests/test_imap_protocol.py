@@ -206,3 +206,21 @@ async def test_a_server_that_ignores_logout_is_still_disconnected_promptly(
 
     assert loop.time() - started < 3
     assert imap_server.live_connections == 0
+
+
+async def test_a_domain_sender_is_searched_by_domain_on_the_wire(
+    imap_server: RealImapServer, socket_enabled
+) -> None:
+    import dataclasses
+
+    settings = dataclasses.replace(
+        _settings(imap_server.port), senders=("@annie-heuser.schule",), subject_filter="Speiseplan"
+    )
+    client = ReadOnlyIMAP4(host="127.0.0.1", port=imap_server.port, timeout=10)
+
+    attachments = await async_fetch_candidates(client, settings, datetime.date(2026, 9, 30))
+
+    searches = [c for c in imap_server.commands if "SEARCH" in c.upper()]
+    assert len(searches) == 1
+    assert 'FROM "annie-heuser.schule"' in searches[0]
+    assert [a.filename for a in attachments] == ["AHS Speiseplan 26-40.pdf"]

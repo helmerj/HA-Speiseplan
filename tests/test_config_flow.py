@@ -99,6 +99,15 @@ async def test_the_options_flow_stores_credentials_in_entry_data(hass: HomeAssis
         ({"host": "   "}, {"host": "no_host"}),
         ({"senders": ["hello"]}, {"senders": "invalid_sender"}),
         ({"senders": ["Herr Stollberg <a@b.de>"]}, {"senders": "invalid_sender"}),
+        ({"senders": ["@"]}, {"senders": "invalid_sender"}),
+        ({"senders": ["@foo"]}, {"senders": "invalid_sender"}),
+        ({"senders": ["a@@b.de"]}, {"senders": "invalid_sender"}),
+        ({"senders": ["@annie heuser.schule"]}, {"senders": "invalid_sender"}),
+        ({"senders": ["@annie-heuser.schule."]}, {"senders": "invalid_sender"}),
+        ({"senders": ["@..de"]}, {"senders": "invalid_sender"}),
+        ({"senders": ["@müller.de"]}, {"senders": "invalid_sender"}),
+        ({"senders": ["@x\\y.de"]}, {"senders": "invalid_sender"}),
+        ({"senders": ["a\\b@x.de"]}, {"senders": "invalid_sender"}),
         ({"subject_filter": "  "}, {"subject_filter": "no_subject_filter"}),
         ({"password": ""}, {"password": "no_password"}),
     ],
@@ -181,3 +190,38 @@ async def test_reauth_replaces_only_the_password(hass: HomeAssistant) -> None:
     assert result["reason"] == "reauth_successful"
     assert entry.data["password"] == "new-secret"
     assert entry.data["username"] == MAILBOX_INPUT["username"]
+
+
+async def test_the_options_flow_accepts_a_whole_school_domain(hass: HomeAssistant) -> None:
+    from unittest.mock import patch
+
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=SINGLE_ENTRY_UNIQUE_ID, data={})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    with patch("custom_components.school_menu._imap_client_factory"):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {**MAILBOX_INPUT, "senders": ["@annie-heuser.schule", "Extra@Example.org"]},
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.data["senders"] == ["@annie-heuser.schule", "Extra@Example.org"]
+
+
+async def test_the_options_form_offers_the_school_domain_by_default(hass: HomeAssistant) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=SINGLE_ENTRY_UNIQUE_ID, data={})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    defaults = {
+        str(key): key.default() for key in result["data_schema"].schema if callable(key.default)
+    }
+
+    assert defaults["senders"] == ["@annie-heuser.schule"]
+    assert defaults["subject_filter"] == "Speiseplan"

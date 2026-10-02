@@ -8,6 +8,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from email.header import decode_header, make_header
+from email.headerregistry import HeaderRegistry
 from email.message import Message
 from email.utils import getaddresses, parsedate_to_datetime
 from typing import Protocol
@@ -143,9 +144,14 @@ def subject_matches(subject: str, subject_filter: str) -> bool:
     return subject_filter.casefold() in subject.casefold()
 
 
+def _search_term(sender: str) -> str:
+    entry = sender.strip()
+    return entry[1:] if entry.startswith("@") else entry
+
+
 def search_criteria(sender: str, today: datetime.date) -> tuple[str, ...]:
     since = (today - datetime.timedelta(days=SEARCH_WINDOW_DAYS)).strftime(IMAP_DATE_FORMAT)
-    return ("SINCE", since, "FROM", f'"{sender}"')
+    return ("SINCE", since, "FROM", f'"{_search_term(sender)}"')
 
 
 def pdf_attachments(message: Message) -> list[tuple[str, bytes]]:
@@ -212,9 +218,31 @@ def sender_addresses(raw_from: str) -> set[str]:
     return {address.lower() for _, address in getaddresses([raw_from]) if address}
 
 
+_HEADERS = HeaderRegistry()
+
+
+def _single_from_addresses(raw_from: str) -> list[str]:
+    try:
+        header = _HEADERS("from", raw_from)
+    except Exception:
+        return []
+    if any(group.display_name is not None for group in header.groups):
+        return []
+    return [address.addr_spec.lower() for address in header.addresses if address.addr_spec]
+
+
 def sender_allowed(raw_from: str, senders: Iterable[str]) -> bool:
-    allowed = {sender.strip().lower() for sender in senders}
-    return bool(sender_addresses(raw_from) & allowed)
+    entries = {sender.strip().lower() for sender in senders if sender.strip()}
+    domains = {entry[1:] for entry in entries if entry.startswith("@")}
+    addresses = entries - {f"@{domain}" for domain in domains}
+    found = _single_from_addresses(raw_from)
+    if len(found) != 1:
+        return False
+    address = found[0]
+    if address in addresses:
+        return True
+    local, at, domain = address.rpartition("@")
+    return bool(at and local and domain in domains)
 
 
 async def _async_teardown(client: ImapClient) -> None:

@@ -667,7 +667,7 @@ All 15 branches closed. These are binding; §§1–9 above already reflect them.
 | R11 | Repo | `helmerj/HA-Speiseplan`; hassfest + HACS + pytest workflows, `git init` + initial commit; **no** issue/PR templates | §3, §9 M1 |
 | R12 | Parser seam | `extract_lines(bytes)` / `parse_lines(lines)`; synthetic cases are string lists, no fixture PDFs | §5.1, §8 |
 | R13 | Coordinator | `DataUpdateCoordinator` with `update_interval=None` in M1; `CoordinatorEntity` sensors | §6 |
-| R14 | Mail matching | Sender **and** subject both required; subject = case-insensitive substring on the RFC 2047-decoded header | §5.5 |
+| R14 | Mail matching | Sender **and** subject both required; subject = case-insensitive substring on the RFC 2047-decoded header. **Amended 2026-10-02 (HAS-1):** sender may be a whole domain (`@annie-heuser.schule`, the new default); default subject filter `Speiseplan` | §5.5 |
 | R15 | Staleness detection | `sensor.school_menu_last_import` (timestamp, diagnostic) instead of an alarm — holidays are absence of data, so an alarm would false-fire every Ferien | §4.3 |
 
 **Added after the grilling, from the operator's mail setup:** two senders
@@ -715,4 +715,55 @@ Anything unmatched, and every day without a menu, keeps the neutral `mdi:food`. 
 expose it as their `icon`, and the card's template tiles read it via `state_attr(e, 'icon')`, so it
 changes everywhere, not only on the card. Very short, ambiguous keywords (`ei`, `mais` as a bare word)
 are deliberately left out: "ei" would match "Reis" and "Brei".
+
+**Amendment 2026-10-02 — any school sender, "Speiseplan" subject, manual re-check (HAS-1).**
+A third school employee sends the menu PDF from another `@annie-heuser.schule` address with a
+different subject. Plan: `docs/plans/school-domain-senders.md`.
+
+- **Domain senders (§5.4, §5.5 filter 1).** An entry in `senders` that starts with `@` matches every
+  address of that domain. The match is exact on the part after the last `@` of the *parsed address*,
+  never on the display name and never as a suffix (`x@annie-heuser.schule.evil.example` and
+  `annie-heuser.schule@evil.example` are rejected). The IMAP search for a domain entry is
+  `FROM "annie-heuser.schule"`; the local re-check stays authoritative. Full addresses keep working.
+  The default becomes `["@annie-heuser.schule"]`.
+- **Subject (§10 R14).** The default `subject_filter` becomes `Speiseplan` (same case-insensitive
+  substring semantics). The PDF-attachment requirement is unchanged: a matching mail without a PDF is
+  ignored. `Speiseplan KW <n>` still feeds `fallback_week_start` when the subject carries it.
+- **Migration.** Config entry minor version 1 → 2. `async_migrate_entry` replaces `senders` only when
+  it equals the old two-teacher default, and `subject_filter` only when it is `Speiseplan KW`;
+  customised values and credentials are untouched.
+- **Manual re-check.** `button.school_menu_check_mail` ("Speiseplan jetzt abrufen") and the action
+  `school_menu.check_mail` call one coordinator method. It clears the in-memory `seen_messages` and
+  `rejected_hashes`, then polls, so the whole 14-day window is re-read and refused attachments are
+  retried. The three dedup layers still prevent duplicate imports and `last_import` churn. Without a
+  configured mailbox the action raises `ServiceValidationError` and the button is unavailable.
+- **Poll interval.** Unchanged (`scan_interval_minutes`, 5–1440, default 15); now documented.
+- **Accepted risk.** `From` can be forged; widening from two addresses to the school domain widens who
+  can feed the sensors. Mitigations unchanged: only the configured folder is read (provider spam/DMARC
+  filtering applies first), and only a PDF that parses as a menu is stored, with the IMAP shrink guard.
+
+**Amendment 2026-10-02 (b) — HAS-1 review round 1.**
+
+- **Exactly one sender address.** A `From` header that carries more than one address (a list, or a
+  group) is rejected outright, even when one of them is a school address. Several addresses in
+  `From` is a known way to slip past DMARC alignment — the very mitigation the accepted risk above
+  relies on.
+- **Domain entries are ASCII hostnames** (`@label.label.tld`, letters/digits/hyphens, case-insensitive).
+  A trailing dot, empty labels or a Unicode domain would never match a mail header and would send a
+  non-ASCII IMAP SEARCH term, so the form refuses them. Backslashes are refused in every sender entry
+  (they would break the quoted SEARCH term).
+- **Migration** replaces `senders` and `subject_filter` independently, comparing both after trimming
+  whitespace (senders also case-insensitively and in any order).
+- **Check mail reports failure.** If the forced poll fails, the action raises `HomeAssistantError`
+  (`check_mail_failed`, with the reason) and the button press shows it; it never pretends success.
+- **Check mail is throttled.** A press while a poll is running is skipped (no second IMAP session),
+  and a forced check within 60 s of the previous forced check is skipped too, so an automation looping
+  over `school_menu.check_mail` cannot bypass the 5-minute minimum interval. Scheduled polls and forced
+  checks share one lock, so the mailbox never has two sessions from this integration at once.
+- **Re-notification on a forced check.** Clearing `rejected_hashes` means an attachment that is still
+  unreadable, or still refused by the shrink guard, raises its `school_menu_import_error` notification
+  again on every forced check. That is intended: the operator asked to re-check. The §7 row "once per
+  HA run" applies to scheduled polls only.
+- **Rollback to v0.1.0.** v0.1.0 does not understand `@domain` entries: it would ignore all mail and
+  refuse to save the options form. Before downgrading, set *Senders* back to full addresses.
 
