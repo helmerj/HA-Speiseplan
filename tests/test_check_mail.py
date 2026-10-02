@@ -38,6 +38,10 @@ async def _press(hass: HomeAssistant) -> None:
     await hass.async_block_till_done()
 
 
+def _notifications(hass: HomeAssistant) -> dict:
+    return persistent_notification._async_get_or_create_notifications(hass)
+
+
 def _logins(server: FakeImapServer) -> int:
     return len([c for c in server.commands if c[0] == "login"])
 
@@ -54,16 +58,15 @@ async def test_checking_now_polls_once_and_rereads_the_whole_window(
     )
     server.uid_validity = "7"
     coordinator = await setup_mailbox(hass, mail_entry, server)
+    server.commands.clear()
     await coordinator.async_refresh()
-    assert [c for c in server.commands[-6:] if c[0] == "uid"] == []
-    logins = _logins(server)
+    assert [c for c in server.commands if c[0] == "uid"] == []
     server.commands.clear()
 
     await _check(hass)
 
     assert _logins(server) == 1
     assert body_fetches(server) == ["1"]
-    assert logins >= 1
 
 
 async def test_checking_now_imports_nothing_twice(
@@ -103,9 +106,11 @@ async def test_checking_now_retries_an_attachment_that_was_refused(
     with patch("custom_components.school_menu.coordinator.extract_lines", _extract):
         await coordinator.async_refresh()
         assert attempts == []
+        assert NOTIFICATION_ERROR_ID not in _notifications(hass)
         await _check(hass)
 
     assert attempts == [b"broken"]
+    assert "kaputt.pdf" in _notifications(hass)[NOTIFICATION_ERROR_ID]["message"]
 
 
 async def test_the_button_checks_the_mailbox_now(
@@ -149,3 +154,89 @@ async def test_without_a_mailbox_the_button_is_unavailable_and_the_action_refuse
     with pytest.raises(ServiceValidationError) as raised:
         await _check(hass)
     assert raised.value.translation_key == "no_mailbox"
+
+
+async def test_a_failed_check_is_reported_not_swallowed(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    from homeassistant.exceptions import HomeAssistantError
+
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer([])
+    await setup_mailbox(hass, mail_entry, server)
+    server.select_result = "NO"
+
+    with pytest.raises(HomeAssistantError) as raised:
+        await _check(hass)
+
+    assert raised.value.translation_key == "check_mail_failed"
+    assert "EXAMINE" in raised.value.translation_placeholders["reason"]
+    assert "hunter2" not in str(raised.value.translation_placeholders)
+
+
+async def test_a_second_check_within_a_minute_is_skipped(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    import datetime
+
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer([])
+    await setup_mailbox(hass, mail_entry, server)
+    server.commands.clear()
+
+    await _check(hass)
+    await _press(hass)
+    assert _logins(server) == 1
+
+    freezer.tick(datetime.timedelta(seconds=61))
+    await _press(hass)
+    assert _logins(server) == 2
+
+
+async def test_two_checks_at_once_open_one_session(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    import asyncio
+
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer([])
+    coordinator = await setup_mailbox(hass, mail_entry, server)
+    server.commands.clear()
+
+    await asyncio.gather(coordinator.async_check_mail_now(), coordinator.async_check_mail_now())
+
+    assert _logins(server) == 1
+
+
+async def test_a_check_during_a_running_poll_is_skipped(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer([])
+    coordinator = await setup_mailbox(hass, mail_entry, server)
+    server.commands.clear()
+
+    async with coordinator.poll_lock:
+        await coordinator.async_check_mail_now()
+
+    assert _logins(server) == 0
+
+
+async def test_a_scheduled_poll_waits_while_a_check_holds_the_mailbox(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    import asyncio
+
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer([])
+    coordinator = await setup_mailbox(hass, mail_entry, server)
+    server.commands.clear()
+
+    async with coordinator.poll_lock:
+        task = hass.async_create_task(coordinator.async_refresh())
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert _logins(server) == 0
+    await task
+
+    assert _logins(server) == 1

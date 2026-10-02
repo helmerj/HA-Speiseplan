@@ -46,8 +46,8 @@ from .const import (
     SINGLE_ENTRY_UNIQUE_ID,
 )
 
-EMAIL_ADDRESS = re.compile(r"[^@\s\"<>,;]+@[^@\s\"<>,;]+\.[^@\s\"<>,;]+")
-EMAIL_DOMAIN = re.compile(r"@[^@\s\"<>,;]+\.[^@\s\"<>,;]+")
+EMAIL_ADDRESS = re.compile(r"[^@\s\"<>,;\\]+@[^@\s\"<>,;\\]+\.[^@\s\"<>,;\\]+")
+EMAIL_DOMAIN = re.compile(r"@(?:[a-z0-9-]+\.)+[a-z]{2,}", re.IGNORECASE)
 
 STEP_USER_SCHEMA = vol.Schema({vol.Optional(CONF_NAME, default=DEFAULT_NAME): str})
 

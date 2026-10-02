@@ -8,11 +8,12 @@ import logging
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    CHECK_MAIL_COOLDOWN_SECONDS,
     CONF_FOLDER,
     CONF_HOST,
     CONF_PASSWORD,
@@ -96,6 +97,8 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
         self.consecutive_failures = 0
         self.rejected_hashes: set[str] = set()
         self.seen_messages: set[str] = set()
+        self.poll_lock = asyncio.Lock()
+        self._last_forced_check: datetime.datetime | None = None
 
     async def async_initialise(self) -> None:
         await self.store.async_load()
@@ -105,11 +108,12 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
         if settings is None or self.client_factory is None:
             return
         try:
-            client = self.client_factory(settings)
-            async with asyncio.timeout(IMAP_POLL_TIMEOUT_SECONDS):
-                attachments = await async_fetch_candidates(
-                    client, settings, dt_util.now().date(), self.seen_messages
-                )
+            async with self.poll_lock:
+                client = self.client_factory(settings)
+                async with asyncio.timeout(IMAP_POLL_TIMEOUT_SECONDS):
+                    attachments = await async_fetch_candidates(
+                        client, settings, dt_util.now().date(), self.seen_messages
+                    )
         except ImapAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
         except (ImapTransportError, OSError, TimeoutError) as err:
@@ -138,9 +142,23 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
         return imap_settings(self.config_entry) is not None
 
     async def async_check_mail_now(self) -> None:
+        now = dt_util.utcnow()
+        last = self._last_forced_check
+        if self.poll_lock.locked() or (
+            last is not None and (now - last).total_seconds() < CHECK_MAIL_COOLDOWN_SECONDS
+        ):
+            _LOGGER.info("Skipping a forced mail check: one ran or is running just now")
+            return
+        self._last_forced_check = now
         self.seen_messages.clear()
         self.rejected_hashes.clear()
         await self.async_refresh()
+        if not self.last_update_success:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="check_mail_failed",
+                translation_placeholders={"reason": str(self.last_exception or "unknown")},
+            )
 
     def _reject(self, filename: str, content_hash: str, reason: str) -> None:
         self.rejected_hashes.add(content_hash)

@@ -62,25 +62,38 @@ async def test_the_old_senders_in_another_order_or_case_still_count_as_the_defau
 
 
 @pytest.mark.parametrize(
-    ("senders", "subject"),
+    ("senders", "subject", "expected_senders", "expected_subject"),
     [
-        (["only.one@annie-heuser.schule"], "Speiseplan KW"),
-        ([*OLD_SENDERS, "third@annie-heuser.schule"], "Menü"),
-        (list(OLD_SENDERS), "Mittagessen"),
+        (
+            ["only.one@annie-heuser.schule"],
+            "Speiseplan KW",
+            ["only.one@annie-heuser.schule"],
+            "Speiseplan",
+        ),
+        (list(OLD_SENDERS), "Mittagessen", ["@annie-heuser.schule"], "Mittagessen"),
+        ([*OLD_SENDERS, "third@x.de"], "Menü", [*OLD_SENDERS, "third@x.de"], "Menü"),
+        (
+            [f" {OLD_SENDERS[0]} ", OLD_SENDERS[1]],
+            "  Speiseplan KW ",
+            ["@annie-heuser.schule"],
+            "Speiseplan",
+        ),
     ],
 )
-async def test_customised_values_are_kept(
-    hass: HomeAssistant, senders: list[str], subject: str
+async def test_senders_and_subject_are_migrated_independently(
+    hass: HomeAssistant,
+    senders: list[str],
+    subject: str,
+    expected_senders: list[str],
+    expected_subject: str,
 ) -> None:
     entry = _entry({**MAILBOX, "senders": senders, "subject_filter": subject})
 
     await _set_up(hass, entry)
 
     assert entry.minor_version == 2
-    if senders != OLD_SENDERS:
-        assert entry.data["senders"] == senders
-    if subject != "Speiseplan KW":
-        assert entry.data["subject_filter"] == subject
+    assert entry.data["senders"] == expected_senders
+    assert entry.data["subject_filter"] == expected_subject
 
 
 async def test_an_entry_without_a_mailbox_only_gets_its_version_bumped(
@@ -102,13 +115,3 @@ async def test_a_migrated_entry_is_left_alone(hass: HomeAssistant) -> None:
 
     assert entry.data["senders"] == OLD_SENDERS
     assert entry.data["subject_filter"] == "Speiseplan KW"
-
-
-async def test_a_future_major_version_is_refused(hass: HomeAssistant) -> None:
-    entry = MockConfigEntry(
-        domain=DOMAIN, unique_id=SINGLE_ENTRY_UNIQUE_ID, version=2, minor_version=1, data={}
-    )
-    entry.add_to_hass(hass)
-
-    assert not await hass.config_entries.async_setup(entry.entry_id)
-    assert entry.state is ConfigEntryState.MIGRATION_ERROR

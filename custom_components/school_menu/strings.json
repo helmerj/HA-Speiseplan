@@ -39,6 +39,9 @@
     },
     "no_mailbox": {
       "message": "No mailbox is configured. Set one up under School Menu → Configure first."
+    },
+    "check_mail_failed": {
+      "message": "Checking the mailbox failed: {reason}"
     }
   },
   "services": {

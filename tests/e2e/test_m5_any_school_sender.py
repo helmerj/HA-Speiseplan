@@ -10,7 +10,7 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.school_menu.const import DOMAIN, SINGLE_ENTRY_UNIQUE_ID
-from tests.fake_imap import MAILBOX, TEACHER_A, FakeImapServer, FakeMessage, pdf
+from tests.fake_imap import MAILBOX, TEACHER_A, FakeImapServer, FakeMessage, body_fetches, pdf
 
 pytestmark = [pytest.mark.e2e, pytest.mark.m5]
 
@@ -57,7 +57,7 @@ async def test_a_v010_install_picks_up_any_school_sender_and_can_check_on_demand
         server.messages = [
             _message("1", f"Küche <{KITCHEN_OFFICE}>", "Speiseplan für nächste Woche", pdf()),
             _message("2", f"Herr Stollberg <{TEACHER_A}>", "Speiseplan KW40", pdf() + b"\n%x\n"),
-            _message("3", '"annie-heuser.schule" <menu@evil.example>', "Speiseplan KW41", pdf()),
+            _message("3", '"annie-heuser.schule" <menu@evil.example>', "Speiseplan KW", b"forged"),
             _message("4", f"Eltern <{KITCHEN_OFFICE}>", "AW: Frage zum Speiseplan", None),
         ]
         changes: list[str] = []
@@ -81,6 +81,7 @@ async def test_a_v010_install_picks_up_any_school_sender_and_can_check_on_demand
         coordinator = hass.data[DOMAIN][entry.entry_id]
         assert list(coordinator.store.weeks) == ["2026-W40"]
         assert len(changes) == 1
+        assert sorted(body_fetches(server)) == ["1", "2", "4"]
 
         logins = len([c for c in server.commands if c[0] == "login"])
         await hass.services.async_call(

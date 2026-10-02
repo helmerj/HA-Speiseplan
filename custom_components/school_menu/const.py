@@ -37,6 +37,7 @@ GERMAN_WEEKDAYS = (
 
 SERVICE_IMPORT_PDF = "import_pdf"
 SERVICE_CHECK_MAIL = "check_mail"
+CHECK_MAIL_COOLDOWN_SECONDS = 60
 BUTTON_CHECK_MAIL = "check_mail"
 CONF_FILE_PATH = "file_path"
 CONF_FILE_ID = "file_id"

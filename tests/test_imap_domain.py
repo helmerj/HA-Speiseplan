@@ -64,6 +64,12 @@ def test_any_address_of_the_school_domain_is_allowed(raw_from: str) -> None:
         "Mallory <x@notannie-heuser.schule>",
         "Mallory <x@sub.annie-heuser.schule>",
         "@annie-heuser.schule",
+        '""@annie-heuser.schule',
+        'Mallory <""@annie-heuser.schule>',
+        "attacker@evil.example, x@annie-heuser.schule",
+        "x@annie-heuser.schule, attacker@evil.example",
+        "Group: x@annie-heuser.schule;",
+        "a@annie-heuser.schule, b@annie-heuser.schule",
         "",
     ],
 )

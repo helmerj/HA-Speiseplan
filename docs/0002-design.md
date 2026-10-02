@@ -742,3 +742,28 @@ different subject. Plan: `docs/plans/school-domain-senders.md`.
   can feed the sensors. Mitigations unchanged: only the configured folder is read (provider spam/DMARC
   filtering applies first), and only a PDF that parses as a menu is stored, with the IMAP shrink guard.
 
+**Amendment 2026-10-02 (b) — HAS-1 review round 1.**
+
+- **Exactly one sender address.** A `From` header that carries more than one address (a list, or a
+  group) is rejected outright, even when one of them is a school address. Several addresses in
+  `From` is a known way to slip past DMARC alignment — the very mitigation the accepted risk above
+  relies on.
+- **Domain entries are ASCII hostnames** (`@label.label.tld`, letters/digits/hyphens, case-insensitive).
+  A trailing dot, empty labels or a Unicode domain would never match a mail header and would send a
+  non-ASCII IMAP SEARCH term, so the form refuses them. Backslashes are refused in every sender entry
+  (they would break the quoted SEARCH term).
+- **Migration** replaces `senders` and `subject_filter` independently, comparing both after trimming
+  whitespace (senders also case-insensitively and in any order).
+- **Check mail reports failure.** If the forced poll fails, the action raises `HomeAssistantError`
+  (`check_mail_failed`, with the reason) and the button press shows it; it never pretends success.
+- **Check mail is throttled.** A press while a poll is running is skipped (no second IMAP session),
+  and a forced check within 60 s of the previous forced check is skipped too, so an automation looping
+  over `school_menu.check_mail` cannot bypass the 5-minute minimum interval. Scheduled polls and forced
+  checks share one lock, so the mailbox never has two sessions from this integration at once.
+- **Re-notification on a forced check.** Clearing `rejected_hashes` means an attachment that is still
+  unreadable, or still refused by the shrink guard, raises its `school_menu_import_error` notification
+  again on every forced check. That is intended: the operator asked to re-check. The §7 row "once per
+  HA run" applies to scheduled polls only.
+- **Rollback to v0.1.0.** v0.1.0 does not understand `@domain` entries: it would ignore all mail and
+  refuse to save the options form. Before downgrading, set *Senders* back to full addresses.
+

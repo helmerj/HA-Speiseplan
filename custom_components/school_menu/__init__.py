@@ -218,13 +218,11 @@ def _is_legacy_sender_default(senders: object) -> bool:
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    if entry.version > 1:
-        return False
     if entry.minor_version < 2:
         data = dict(entry.data)
         if _is_legacy_sender_default(data.get(CONF_SENDERS)):
             data[CONF_SENDERS] = list(DEFAULT_SENDERS)
-        if data.get(CONF_SUBJECT_FILTER) == LEGACY_DEFAULT_SUBJECT_FILTER:
+        if str(data.get(CONF_SUBJECT_FILTER, "")).strip() == LEGACY_DEFAULT_SUBJECT_FILTER:
             data[CONF_SUBJECT_FILTER] = DEFAULT_SUBJECT_FILTER
         hass.config_entries.async_update_entry(entry, data=data, minor_version=2)
     return True

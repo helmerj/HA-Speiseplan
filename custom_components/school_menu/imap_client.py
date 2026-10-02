@@ -8,6 +8,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from email.header import decode_header, make_header
+from email.headerregistry import HeaderRegistry
 from email.message import Message
 from email.utils import getaddresses, parsedate_to_datetime
 from typing import Protocol
@@ -217,17 +218,31 @@ def sender_addresses(raw_from: str) -> set[str]:
     return {address.lower() for _, address in getaddresses([raw_from]) if address}
 
 
+_HEADERS = HeaderRegistry()
+
+
+def _single_from_addresses(raw_from: str) -> list[str]:
+    try:
+        header = _HEADERS("from", raw_from)
+    except Exception:
+        return []
+    if any(group.display_name is not None for group in header.groups):
+        return []
+    return [address.addr_spec.lower() for address in header.addresses if address.addr_spec]
+
+
 def sender_allowed(raw_from: str, senders: Iterable[str]) -> bool:
     entries = {sender.strip().lower() for sender in senders if sender.strip()}
     domains = {entry[1:] for entry in entries if entry.startswith("@")}
     addresses = entries - {f"@{domain}" for domain in domains}
-    for address in sender_addresses(raw_from):
-        if address in addresses:
-            return True
-        local, at, domain = address.rpartition("@")
-        if at and local and domain in domains:
-            return True
-    return False
+    found = _single_from_addresses(raw_from)
+    if len(found) != 1:
+        return False
+    address = found[0]
+    if address in addresses:
+        return True
+    local, at, domain = address.rpartition("@")
+    return bool(at and local and domain in domains)
 
 
 async def _async_teardown(client: ImapClient) -> None:

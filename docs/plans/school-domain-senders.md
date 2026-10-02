@@ -71,7 +71,7 @@ and only PDFs that parse as a menu are stored. The design note will record this.
 | `custom_components/school_menu/button.py` | **new**, the check-mail button with a pinned `entity_id` |
 | `services.yaml`, `strings.json`, `translations/{en,de}.json` | action, button name, field descriptions |
 | `README.md` | mailbox section: domain senders, subject, interval, re-check |
-| `tests/test_imap.py` | domain search term and domain matching, including spoof cases |
+| `tests/test_imap_domain.py` | **new**, domain search term and domain matching, including spoof and multi-address cases |
 | `tests/test_config_flow.py` | `@domain` accepted, malformed domain rejected |
 | `tests/test_migration.py` | **new**, migration of defaults; custom values kept |
 | `tests/test_check_mail.py` | **new**, button and action: forced re-read, dedup holds, no mailbox → error |

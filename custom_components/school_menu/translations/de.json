@@ -39,6 +39,9 @@
     },
     "no_mailbox": {
       "message": "Es ist kein Postfach eingerichtet. Richte zuerst eines unter School Menu → Konfigurieren ein."
+    },
+    "check_mail_failed": {
+      "message": "Abruf des Postfachs fehlgeschlagen: {reason}"
     }
   },
   "services": {

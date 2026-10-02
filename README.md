@@ -46,10 +46,17 @@ senders, the subject filter and the poll interval. A mail is imported when **all
 The mailbox is checked every **15 minutes** by default (5–1440, same form). For an immediate check,
 press **Check mail now** (`button.school_menu_check_mail`, German: "Speiseplan jetzt abrufen") or
 call the action `school_menu.check_mail`. It re-reads all school mails of the last 14 days, retries
-attachments that were refused before, and still never imports a menu twice.
+attachments that were refused before, and still never imports a menu twice. If the mailbox can't be
+reached, the button and the action report the error instead of pretending success. A second check
+within a minute, or while a check is running, is skipped. An attachment that is still unreadable is
+reported again on every manual check.
 
 Installations from v0.1.0 that still have the old defaults (the two class teachers, `Speiseplan KW`)
-are switched to the new defaults automatically on update; customised values are kept.
+are switched to the new defaults automatically on update; customised values are kept. A mail
+whose `From` carries more than one address is never accepted.
+
+**Downgrading to v0.1.0:** that version doesn't understand `@domain` senders and would ignore all
+mail. Set *Senders* back to full addresses before you downgrade.
 
 - The mailbox is opened **read-only**: messages are never marked read, moved or deleted.
 - Another copy of the same week, from a second sender or resent, changes nothing — no second
