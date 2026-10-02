@@ -7,10 +7,11 @@ import logging
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from email.errors import HeaderParseError
 from email.header import decode_header, make_header
 from email.headerregistry import HeaderRegistry
 from email.message import Message
-from email.utils import getaddresses, parsedate_to_datetime
+from email.utils import parsedate_to_datetime
 from typing import Protocol
 
 from aioimaplib import IMAP4, IMAP4_SSL, SELECTED, AioImapException
@@ -214,17 +215,16 @@ def _login_failure(response: ImapResponse, settings: ImapSettings) -> Exception:
     return ImapTransportError(message)
 
 
-def sender_addresses(raw_from: str) -> set[str]:
-    return {address.lower() for _, address in getaddresses([raw_from]) if address}
-
-
 _HEADERS = HeaderRegistry()
+_FOLD = re.compile(r"\r?\n(?=[ \t])")
 
 
 def _single_from_addresses(raw_from: str) -> list[str]:
+    unfolded = _FOLD.sub("", raw_from).strip()
     try:
-        header = _HEADERS("from", raw_from)
-    except Exception:
+        header = _HEADERS("from", unfolded)
+    except (ValueError, IndexError, HeaderParseError) as err:
+        _LOGGER.debug("Unparseable From header: %s", err)
         return []
     if any(group.display_name is not None for group in header.groups):
         return []

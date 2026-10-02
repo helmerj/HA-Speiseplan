@@ -48,7 +48,8 @@ press **Check mail now** (`button.school_menu_check_mail`, German: "Speiseplan j
 call the action `school_menu.check_mail`. It re-reads all school mails of the last 14 days, retries
 attachments that were refused before, and still never imports a menu twice. If the mailbox can't be
 reached, the button and the action report the error instead of pretending success. A second check
-within a minute, or while a check is running, is skipped. An attachment that is still unreadable is
+within a minute of a successful one, or while a check is running, is skipped with a short
+message saying so. An attachment that is still unreadable is
 reported again on every manual check.
 
 Installations from v0.1.0 that still have the old defaults (the two class teachers, `Speiseplan KW`)

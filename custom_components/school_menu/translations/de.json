@@ -42,6 +42,9 @@
     },
     "check_mail_failed": {
       "message": "Abruf des Postfachs fehlgeschlagen: {reason}"
+    },
+    "check_mail_skipped": {
+      "message": "Das Postfach wurde gerade erst geprüft oder wird gerade geprüft. Versuch es in einer Minute noch einmal."
     }
   },
   "services": {

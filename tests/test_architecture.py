@@ -67,3 +67,22 @@ def test_the_prose_detector_catches_a_docstring(tmp_path: Path) -> None:
     sample = tmp_path / "sample.py"
     sample.write_text('"""explanation"""\n\nVERSION = 1\n')
     assert _prose_offenders(sample)
+
+
+def test_packages_home_assistant_ships_are_not_pinned() -> None:
+    import json
+
+    manifest = json.loads((COMPONENT / "manifest.json").read_text())
+    shipped_by_core = {"aioimaplib"}
+    for requirement in manifest["requirements"]:
+        name = requirement.split(">")[0].split("=")[0].split("<")[0].strip().lower()
+        if name in shipped_by_core:
+            assert "==" not in requirement, f"{requirement} must be a minimum version"
+
+
+def test_the_integration_declares_it_is_set_up_from_the_ui_only(caplog) -> None:
+    from custom_components.school_menu import CONFIG_SCHEMA
+
+    CONFIG_SCHEMA({"school_menu": {"host": "imap.example.org"}})
+
+    assert "does not support YAML setup" in caplog.text

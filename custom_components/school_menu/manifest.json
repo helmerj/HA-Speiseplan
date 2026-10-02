@@ -17,7 +17,7 @@
   ],
   "requirements": [
     "pypdf==6.19.0",
-    "aioimaplib==2.0.1"
+    "aioimaplib>=2.0.1"
   ],
   "single_config_entry": true,
   "version": "0.2.0"
