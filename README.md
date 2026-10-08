@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/helmerj/HA-Speiseplan/main/custom_components/school_menu/brand/icon.png" alt="School Menu" width="128">
+</p>
+
 # School Menu — Home Assistant integration
 
 Turns the weekly lunch-menu PDF from Annie-Heuser-Schule (catered by Organiced Kitchen) into Home
@@ -9,6 +13,7 @@ Assistant sensors, so today's lunch and the next school day's are on the dashboa
 | `sensor.school_menu_next_school_day` | The next school day's main course — Fri, Sat and Sun all resolve to Monday; the `weekday` and `date` attributes say which day it is |
 | `sensor.school_menu_last_import` | Timestamp of the most recent accepted import (diagnostic) |
 | `button.school_menu_check_mail` | Checks the mailbox right away ("Check mail now" / "Speiseplan jetzt abrufen") |
+| `update.school_menu_version` | `on` when a newer School Menu release is out; installs it through HACS |
 
 Each menu sensor also exposes `main`, `side`, `dessert` (positional, not semantic), the full `lines`
 list, `weekday`, `date`, `source_file` and `ingested_at`.
@@ -17,6 +22,7 @@ list, `weekday`, `date`, `source_file` and `ingested_at`.
 
 - Home Assistant **2026.9.3** or newer.
 - Nothing else for the sensors. The PDF is parsed locally with `pypdf`; no cloud service is involved.
+  The only outbound request is the release check against the GitHub API (see below).
 - For the dashboard card: [Mushroom](https://github.com/piitaya/lovelace-mushroom) (HACS → Frontend).
 
 ## Installation (HACS)
@@ -150,6 +156,39 @@ neutral plate.
 On weekends, holidays and days without a menu the text reads **Kein Mittagessen**. If the
 integration itself is not running, it reads **Speiseplan nicht verfügbar** instead, so a broken
 setup is never mistaken for a day without lunch.
+
+## Updates
+
+HACS checks a custom repository for new releases only when Home Assistant starts and every 48 hours.
+School Menu therefore checks GitHub itself, every 6 hours:
+
+- **`update.school_menu_version`** turns `on` when a newer release is out. It appears under
+  **Settings → Updates**; *Install* hands the exact release over to HACS, then restart as HACS asks.
+- **One notification per new version** ("School Menu"), with a link to the release notes. Once
+  dismissed it does not come back for that version; it disappears by itself after the update.
+- Pre-releases and drafts are ignored. If GitHub is unreachable or rate-limited, nothing is reported
+  and the last known release is kept.
+- To switch the check off, disable the entity (Settings → Entities → School Menu Version → Disable).
+
+Once HACS's own 48-hour check catches up, Settings may list the same release twice, once from School
+Menu and once from HACS; either one installs it.
+
+To get a push message on your phone (Home Assistant Companion app), add this automation and replace
+`notify.mobile_app_your_phone` with your own notify action:
+
+```yaml
+alias: School Menu update available
+triggers:
+  - trigger: state
+    entity_id: update.school_menu_version
+    to: "on"
+actions:
+  - action: notify.mobile_app_your_phone
+    data:
+      title: School Menu
+      message: >-
+        Version {{ state_attr('update.school_menu_version', 'latest_version') }} ist verfügbar.
+```
 
 ## Status
 

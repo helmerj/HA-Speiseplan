@@ -80,3 +80,17 @@ REASON_FEWER_DAYS = "fewer_days"
 
 SOURCE_IMAP = "imap"
 NOTIFICATION_IMAP_ID = "school_menu_imap_error"
+
+UPDATE_VERSION = "version"
+UPDATE_TITLE = "School Menu"
+UPDATE_CHECK_HOURS = 6
+GITHUB_REPOSITORY = "helmerj/HA-Speiseplan"
+GITHUB_REPOSITORY_ID = 1389147095
+GITHUB_LATEST_RELEASE_URL = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases/latest"
+GITHUB_TIMEOUT_SECONDS = 10
+GITHUB_HEADERS = {
+    "Accept": "application/vnd.github+json",
+    "User-Agent": "school-menu-home-assistant",
+}
+HACS_DOMAIN = "hacs"
+NOTIFICATION_UPDATE_ID = "school_menu_update"

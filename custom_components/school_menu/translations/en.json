@@ -45,6 +45,15 @@
     },
     "check_mail_skipped": {
       "message": "The mailbox was checked just now or is being checked. Try again in a minute."
+    },
+    "update_unknown": {
+      "message": "No release has been found yet. Try again after the next check, or install via HACS."
+    },
+    "install_needs_hacs": {
+      "message": "HACS is not installed or does not track School Menu. Install the update via HACS."
+    },
+    "install_failed": {
+      "message": "HACS could not install version {version}: {error}. Install it via HACS → School Menu."
     }
   },
   "services": {
@@ -105,6 +114,11 @@
     "button": {
       "check_mail": {
         "name": "Check mail now"
+      }
+    },
+    "update": {
+      "version": {
+        "name": "Version"
       }
     }
   }
