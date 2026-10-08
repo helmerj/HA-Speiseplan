@@ -53,7 +53,7 @@ async def test_the_weekend_shows_monday_as_the_next_school_day(
 ) -> None:
     freezer.move_to("2026-10-03 12:00:00+02:00")
     await _setup(hass, config_entry)
-    await _import(hass, _stage(hass, "AHS Speiseplan 26-40.pdf"))
+    await _import(hass, _stage(hass, "Testplan 26-40.pdf"))
 
     today = hass.states.get(TODAY)
     assert today.state == NO_MENU_STATE
@@ -69,15 +69,15 @@ async def test_midnight_rolls_today_over_without_a_reimport(
 ) -> None:
     freezer.move_to("2026-09-29 12:00:00+02:00")
     await _setup(hass, config_entry)
-    await _import(hass, _stage(hass, "AHS Speiseplan 26-40.pdf"))
-    assert hass.states.get(TODAY).state == "Kartoffel Gratin"
+    await _import(hass, _stage(hass, "Testplan 26-40.pdf"))
+    assert hass.states.get(TODAY).state == "Süßkartoffel Auflauf"
 
     freezer.move_to("2026-09-30 00:00:01+02:00")
     async_fire_time_changed(hass, dt_util.now())
     await hass.async_block_till_done()
 
-    assert hass.states.get(TODAY).state == "Chili sin Carne mit Sauer Sahne"
-    assert hass.states.get(TOMORROW).state == "Blumenkohl-Brokkoli-Möhre mit Käse überbacken"
+    assert hass.states.get(TODAY).state == "Ananas-Chili mit Kidneybohnen"
+    assert hass.states.get(TOMORROW).state == "Zucchini-Möhren Puffer mit Kräuterquark"
 
 
 async def test_a_corrupt_pdf_leaves_every_sensor_untouched(
@@ -85,7 +85,7 @@ async def test_a_corrupt_pdf_leaves_every_sensor_untouched(
 ) -> None:
     freezer.move_to("2026-09-30 12:00:00+02:00")
     await _setup(hass, config_entry)
-    await _import(hass, _stage(hass, "AHS Speiseplan 26-40.pdf"))
+    await _import(hass, _stage(hass, "Testplan 26-40.pdf"))
 
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
     before_weeks = {key: dict(value) for key, value in coordinator.store.weeks.items()}
@@ -105,11 +105,11 @@ async def test_last_import_reports_the_week_it_stored(
 ) -> None:
     freezer.move_to("2026-09-28 09:00:00+02:00")
     await _setup(hass, config_entry)
-    await _import(hass, _stage(hass, "AHS Speiseplan 26-40.pdf"))
+    await _import(hass, _stage(hass, "Testplan 26-40.pdf"))
 
     state = hass.states.get("sensor.school_menu_last_import")
     assert state.attributes["week"] == "2026-W40"
-    assert state.attributes["source_file"] == "AHS Speiseplan 26-40.pdf"
+    assert state.attributes["source_file"] == "Testplan 26-40.pdf"
     assert state.attributes["source"] == "manual"
     assert state.attributes["weeks_stored"] == 1
     assert dt_util.parse_datetime(state.state) is not None
@@ -120,7 +120,7 @@ async def test_an_unimported_school_day_reports_no_menu(
 ) -> None:
     freezer.move_to("2026-10-07 12:00:00+02:00")
     await _setup(hass, config_entry)
-    await _import(hass, _stage(hass, "AHS Speiseplan 26-40.pdf"))
+    await _import(hass, _stage(hass, "Testplan 26-40.pdf"))
 
     for entity in (TODAY, TOMORROW):
         state = hass.states.get(entity)
@@ -163,17 +163,17 @@ async def test_last_import_tracks_the_most_recent_of_several_weeks(
 ) -> None:
     freezer.move_to("2026-09-21 09:00:00+02:00")
     await _setup(hass, config_entry)
-    await _import(hass, _stage(hass, "AHS Speiseplan 26-39.pdf"))
+    await _import(hass, _stage(hass, "Testplan 26-39.pdf"))
     first = hass.states.get("sensor.school_menu_last_import").state
 
     freezer.move_to("2026-09-27 18:30:00+02:00")
-    await _import(hass, _stage(hass, "AHS Speiseplan 26-40.pdf"))
+    await _import(hass, _stage(hass, "Testplan 26-40.pdf"))
 
     state = hass.states.get("sensor.school_menu_last_import")
     assert state.state != first
     assert dt_util.parse_datetime(state.state) > dt_util.parse_datetime(first)
     assert state.attributes["week"] == "2026-W40"
-    assert state.attributes["source_file"] == "AHS Speiseplan 26-40.pdf"
+    assert state.attributes["source_file"] == "Testplan 26-40.pdf"
     assert state.attributes["weeks_stored"] == 2
 
 

@@ -26,3 +26,6 @@ htmlcov/
 
 # macOS
 .DS_Store
+
+# Real caterer PDFs: local only, never committed (design §8, HAS-3).
+tests/fixtures/*.pdf

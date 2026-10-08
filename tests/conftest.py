@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.school_menu.const import DOMAIN, SINGLE_ENTRY_UNIQUE_ID
-
-FIXTURES = Path(__file__).parent / "fixtures"
+from tests.pdf_fixtures import FIXTURES, WEEK_39, WEEK_40
 
 pytest_plugins = ["pytest_homeassistant_custom_component"]
 
@@ -24,17 +21,12 @@ async def german_timezone(hass):
 
 @pytest.fixture
 def week_39_pdf() -> bytes:
-    return (FIXTURES / "AHS Speiseplan 26-39.pdf").read_bytes()
+    return (FIXTURES / WEEK_39).read_bytes()
 
 
 @pytest.fixture
 def week_40_pdf() -> bytes:
-    return (FIXTURES / "AHS Speiseplan 26-40.pdf").read_bytes()
-
-
-@pytest.fixture
-def week_41_pdf() -> bytes:
-    return (FIXTURES / "AHS Speiseplan 26-41.pdf").read_bytes()
+    return (FIXTURES / WEEK_40).read_bytes()
 
 
 @pytest.fixture

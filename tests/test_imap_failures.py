@@ -217,7 +217,7 @@ async def test_configuring_the_mailbox_starts_polling(hass: HomeAssistant, freez
         assert hass.data[DOMAIN][entry.entry_id].update_interval is not None
         assert [c for c in server.commands if c[0] == "login"]
         assert hass.states.get("sensor.school_menu_today").state == (
-            "Chili sin Carne mit Sauer Sahne"
+            "Ananas-Chili mit Kidneybohnen"
         )
 
 
@@ -240,7 +240,7 @@ async def test_a_mailbox_outage_at_startup_still_loads_the_stored_week(
         await hass.async_block_till_done(wait_background_tasks=True)
 
     assert mail_entry.state is ConfigEntryState.LOADED
-    assert hass.states.get("sensor.school_menu_today").state == ("Chili sin Carne mit Sauer Sahne")
+    assert hass.states.get("sensor.school_menu_today").state == ("Ananas-Chili mit Kidneybohnen")
     assert hass.services.has_service(DOMAIN, "import_pdf")
 
 

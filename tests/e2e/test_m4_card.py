@@ -22,7 +22,7 @@ TOMORROW = "sensor.school_menu_next_school_day"
 def _stage(hass: HomeAssistant) -> Path:
     www = Path(hass.config.path("www"))
     www.mkdir(parents=True, exist_ok=True)
-    target = www / "AHS Speiseplan 26-40.pdf"
+    target = www / "Testplan 26-40.pdf"
     shutil.copyfile(FIXTURES / target.name, target)
     return target
 
@@ -49,8 +49,7 @@ async def test_the_documented_card_follows_the_week_from_sunday_to_wednesday(
     assert sunday[TOMORROW] == {
         "primary": "Morgen · Montag, 28.09.",
         "secondary": (
-            "Pasta mit Tomaten Sauce dazu Parmesan\n"
-            "Blattsalat mit gerösteten Kernen · Obst\nStand: 27.09."
+            "Spaghetti mit Kürbis-Salbei Sauce\nGurkensalat mit Dill · Obst\nStand: 27.09."
         ),
     }
 
@@ -61,13 +60,11 @@ async def test_the_documented_card_follows_the_week_from_sunday_to_wednesday(
     wednesday = render_card(hass)
     assert wednesday[TODAY] == {
         "primary": "Heute · Mittwoch, 30.09.",
-        "secondary": "Chili sin Carne mit Sauer Sahne\nReis · Blattsalat mit gerösteten Kernen",
+        "secondary": "Ananas-Chili mit Kidneybohnen\nReis · Feldsalat mit Kürbiskernen",
     }
     assert wednesday[TOMORROW] == {
         "primary": "Morgen · Donnerstag, 01.10.",
-        "secondary": (
-            "Blumenkohl-Brokkoli-Möhre mit Käse überbacken\nKartoffeln · Obst\nStand: 27.09."
-        ),
+        "secondary": ("Zucchini-Möhren Puffer mit Kräuterquark\nKartoffeln · Obst\nStand: 27.09."),
     }
     for text in (card_text(hass), str(sunday)):
         assert not re.search(r"(?<![\w-])none(?![\w-])", text, re.IGNORECASE)

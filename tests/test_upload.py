@@ -57,7 +57,7 @@ async def _import_upload(hass: HomeAssistant) -> None:
 async def test_a_real_upload_imports_and_is_consumed(
     hass: HomeAssistant, loaded_entry, uploads: Path
 ) -> None:
-    name = "AHS Speiseplan 26-40.pdf"
+    name = "Testplan 26-40.pdf"
     _stage_upload(uploads, name)
     hass.data[FILE_UPLOAD_DOMAIN].files[FILE_ID] = name
 
@@ -72,7 +72,7 @@ async def test_a_real_upload_imports_and_is_consumed(
 async def test_a_consumed_upload_cannot_be_imported_twice(
     hass: HomeAssistant, loaded_entry, uploads: Path
 ) -> None:
-    name = "AHS Speiseplan 26-40.pdf"
+    name = "Testplan 26-40.pdf"
     _stage_upload(uploads, name)
     hass.data[FILE_UPLOAD_DOMAIN].files[FILE_ID] = name
     await _import_upload(hass)
@@ -115,7 +115,7 @@ async def test_the_upload_is_parsed_off_the_event_loop(
 ) -> None:
     from unittest.mock import patch
 
-    name = "AHS Speiseplan 26-40.pdf"
+    name = "Testplan 26-40.pdf"
     _stage_upload(uploads, name)
     hass.data[FILE_UPLOAD_DOMAIN].files[FILE_ID] = name
 

@@ -27,7 +27,7 @@ def _message(uid: str, sender: str, subject: str, payload: bytes | None) -> Fake
         sender=sender,
         subject=subject,
         date="Sun, 27 Sep 2026 18:04:11 +0200",
-        attachments=[("AHS Speiseplan 26-40.pdf", payload)] if payload is not None else [],
+        attachments=[("Testplan 26-40.pdf", payload)] if payload is not None else [],
     )
 
 
@@ -76,7 +76,7 @@ async def test_a_v010_install_picks_up_any_school_sender_and_can_check_on_demand
         await hass.async_block_till_done(wait_background_tasks=True)
 
         assert hass.states.get("sensor.school_menu_today").state == (
-            "Chili sin Carne mit Sauer Sahne"
+            "Ananas-Chili mit Kidneybohnen"
         )
         coordinator = hass.data[DOMAIN][entry.entry_id]
         assert list(coordinator.store.weeks) == ["2026-W40"]

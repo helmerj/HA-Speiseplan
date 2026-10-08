@@ -31,14 +31,14 @@ def _both_teachers_send_the_same_week(second_copy: bytes) -> FakeImapServer:
                 sender=f"Herr Stollberg <{TEACHER_A}>",
                 subject="Speiseplan KW40",
                 date="Sun, 27 Sep 2026 18:04:11 +0200",
-                attachments=[("AHS Speiseplan 26-40.pdf", pdf())],
+                attachments=[("Testplan 26-40.pdf", pdf())],
             ),
             FakeMessage(
                 uid="2",
                 sender=f"Frau Putzmann <{TEACHER_B}>",
                 subject="Fwd: Speiseplan KW40",
                 date="Sun, 27 Sep 2026 19:12:00 +0200",
-                attachments=[("AHS Speiseplan 26-40.pdf", second_copy)],
+                attachments=[("Testplan 26-40.pdf", second_copy)],
             ),
         ]
     )
@@ -91,11 +91,11 @@ async def test_the_weekly_mail_updates_the_sensors_once_and_the_second_copy_chan
         await _poll_cycle()
 
         today = hass.states.get("sensor.school_menu_today")
-        assert today.state == "Chili sin Carne mit Sauer Sahne"
+        assert today.state == "Ananas-Chili mit Kidneybohnen"
         assert today.attributes["side"] == "Reis"
-        assert today.attributes["source_file"] == "AHS Speiseplan 26-40.pdf"
+        assert today.attributes["source_file"] == "Testplan 26-40.pdf"
         assert hass.states.get("sensor.school_menu_next_school_day").state == (
-            "Blumenkohl-Brokkoli-Möhre mit Käse überbacken"
+            "Zucchini-Möhren Puffer mit Kräuterquark"
         )
         stamp = hass.states.get("sensor.school_menu_last_import").state
 

@@ -125,7 +125,7 @@ async def test_the_button_checks_the_mailbox_now(
     await _press(hass)
 
     assert _logins(server) == 1
-    assert hass.states.get("sensor.school_menu_today").state == "Chili sin Carne mit Sauer Sahne"
+    assert hass.states.get("sensor.school_menu_today").state == "Ananas-Chili mit Kidneybohnen"
 
 
 async def test_the_button_has_a_fixed_id_and_a_readable_name(
@@ -216,7 +216,7 @@ async def test_a_retry_right_after_a_failed_check_polls_again(
     await _check(hass)
 
     assert _logins(server) == 1
-    assert hass.states.get("sensor.school_menu_today").state == "Chili sin Carne mit Sauer Sahne"
+    assert hass.states.get("sensor.school_menu_today").state == "Ananas-Chili mit Kidneybohnen"
 
 
 async def test_two_checks_at_once_open_one_session(

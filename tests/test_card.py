@@ -24,11 +24,11 @@ TODAY = "sensor.school_menu_today"
 TOMORROW = "sensor.school_menu_next_school_day"
 README = Path(__file__).parents[1] / "README.md"
 WEEK = {
-    "2026-09-28": ("Pasta mit Tomaten Sauce dazu Parmesan", "Blattsalat", "Obst"),
-    "2026-09-29": ("Kartoffel Gratin", "Rotebeete-Apfel Salat", "Erdbeere Joghurt"),
-    "2026-09-30": ("Chili sin Carne mit Sauer Sahne", "Reis", "Blattsalat"),
-    "2026-10-01": ("Blumenkohl-Brokkoli-Möhre mit Käse überbacken", "Kartoffeln", "Obst"),
-    "2026-10-02": ("Lauch-Kartoffel Suppe", "Brot", "Bananen Kuchen"),
+    "2026-09-28": ("Spaghetti mit Kürbis-Salbei Sauce", "Blattsalat", "Obst"),
+    "2026-09-29": ("Süßkartoffel Auflauf", "Rotkohl-Birnen Rohkost", "Vanille Joghurt"),
+    "2026-09-30": ("Ananas-Chili mit Kidneybohnen", "Reis", "Blattsalat"),
+    "2026-10-01": ("Zucchini-Möhren Puffer mit Kräuterquark", "Kartoffeln", "Obst"),
+    "2026-10-02": ("Kürbis-Kokos Suppe", "Brot", "Haferkekse"),
 }
 
 
@@ -40,7 +40,7 @@ def _week(overrides: dict[str, tuple[str, ...]] | None = None) -> ParsedWeek:
             DayMenu(date=datetime.date.fromisoformat(iso), lines=lines)
             for iso, lines in sorted(days.items())
         ),
-        source_file="AHS Speiseplan 26-40.pdf",
+        source_file="Testplan 26-40.pdf",
         content_hash=f"hash-{sorted((overrides or {}).items())}",
     )
 
@@ -106,12 +106,12 @@ async def test_a_school_day(hass: HomeAssistant, config_entry: MockConfigEntry, 
     assert render_card(hass) == {
         TODAY: {
             "primary": "Heute · Mittwoch, 30.09.",
-            "secondary": "Chili sin Carne mit Sauer Sahne\nReis · Blattsalat",
+            "secondary": "Ananas-Chili mit Kidneybohnen\nReis · Blattsalat",
         },
         TOMORROW: {
             "primary": "Morgen · Donnerstag, 01.10.",
             "secondary": (
-                "Blumenkohl-Brokkoli-Möhre mit Käse überbacken\nKartoffeln · Obst\nStand: 30.09."
+                "Zucchini-Möhren Puffer mit Kräuterquark\nKartoffeln · Obst\nStand: 30.09."
             ),
         },
     }
@@ -125,7 +125,7 @@ async def test_on_friday_the_next_school_day_is_not_called_tomorrow(
 
     assert render_card(hass)[TOMORROW] == {
         "primary": "Montag, 28.09.",
-        "secondary": "Pasta mit Tomaten Sauce dazu Parmesan\nBlattsalat · Obst\nStand: 25.09.",
+        "secondary": "Spaghetti mit Kürbis-Salbei Sauce\nBlattsalat · Obst\nStand: 25.09.",
     }
 
 
@@ -139,7 +139,7 @@ async def test_on_sunday_monday_is_tomorrow(
         TODAY: {"primary": "Heute · Sonntag, 27.09.", "secondary": "Kein Mittagessen"},
         TOMORROW: {
             "primary": "Morgen · Montag, 28.09.",
-            "secondary": "Pasta mit Tomaten Sauce dazu Parmesan\nBlattsalat · Obst\nStand: 27.09.",
+            "secondary": "Spaghetti mit Kürbis-Salbei Sauce\nBlattsalat · Obst\nStand: 27.09.",
         },
     }
 
@@ -225,7 +225,7 @@ async def test_the_stand_line_uses_the_local_date(
     await _loaded(hass, config_entry, _week())
 
     assert render_card(hass)[TOMORROW]["secondary"] == (
-        "Kartoffel Gratin\nRotebeete-Apfel Salat · Erdbeere Joghurt\nStand: 28.09."
+        "Süßkartoffel Auflauf\nRotkohl-Birnen Rohkost · Vanille Joghurt\nStand: 28.09."
     )
 
 

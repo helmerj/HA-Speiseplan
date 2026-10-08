@@ -87,13 +87,13 @@ async def _import(hass: HomeAssistant, path: str | Path, **extra) -> None:
 
 
 async def test_a_pdf_under_www_imports(hass: HomeAssistant, loaded_entry) -> None:
-    path = _www(hass, "AHS Speiseplan 26-40.pdf")
+    path = _www(hass, "Testplan 26-40.pdf")
 
     await _import(hass, path)
 
     coordinator = hass.data[DOMAIN][loaded_entry.entry_id]
     assert coordinator.menu_for(datetime.date(2026, 9, 28)).main == (
-        "Pasta mit Tomaten Sauce dazu Parmesan"
+        "Spaghetti mit Kürbis-Salbei Sauce"
     )
 
 
@@ -156,7 +156,7 @@ async def test_the_service_refuses_when_no_entry_is_loaded(hass: HomeAssistant) 
 async def test_a_corrupt_pdf_keeps_previous_data_and_raises(
     hass: HomeAssistant, loaded_entry
 ) -> None:
-    good = _www(hass, "AHS Speiseplan 26-40.pdf")
+    good = _www(hass, "Testplan 26-40.pdf")
     await _import(hass, good)
     coordinator = hass.data[DOMAIN][loaded_entry.entry_id]
     before = dict(coordinator.store.weeks)
@@ -181,13 +181,13 @@ async def test_a_failed_import_raises_a_notification(hass: HomeAssistant, loaded
 
 
 async def test_a_successful_manual_import_notifies(hass: HomeAssistant, loaded_entry) -> None:
-    await _import(hass, _www(hass, "AHS Speiseplan 26-40.pdf"))
+    await _import(hass, _www(hass, "Testplan 26-40.pdf"))
 
     assert NOTIFICATION_OK_ID in _notifications(hass)
 
 
 async def test_reimporting_the_same_file_is_idempotent(hass: HomeAssistant, loaded_entry) -> None:
-    path = _www(hass, "AHS Speiseplan 26-40.pdf")
+    path = _www(hass, "Testplan 26-40.pdf")
 
     await _import(hass, path)
     coordinator = hass.data[DOMAIN][loaded_entry.entry_id]
@@ -203,7 +203,7 @@ async def test_reimporting_the_same_file_is_idempotent(hass: HomeAssistant, load
 async def test_a_second_import_of_known_bytes_says_unchanged(
     hass: HomeAssistant, loaded_entry
 ) -> None:
-    path = _www(hass, "AHS Speiseplan 26-40.pdf")
+    path = _www(hass, "Testplan 26-40.pdf")
     await _import(hass, path)
     await _import(hass, path)
 
@@ -215,7 +215,7 @@ async def test_known_bytes_are_skipped_before_any_store_write(
     hass: HomeAssistant, loaded_entry, freezer
 ) -> None:
     freezer.move_to("2026-09-28 10:00:00+02:00")
-    path = _www(hass, "AHS Speiseplan 26-40.pdf")
+    path = _www(hass, "Testplan 26-40.pdf")
     await _import(hass, path)
     coordinator = hass.data[DOMAIN][loaded_entry.entry_id]
     first_ingest = coordinator.store.weeks["2026-W40"]["ingested_at"]
@@ -233,7 +233,7 @@ async def test_supplying_neither_source_is_refused(hass: HomeAssistant, loaded_e
 
 
 async def test_supplying_both_sources_is_refused(hass: HomeAssistant, loaded_entry) -> None:
-    path = _www(hass, "AHS Speiseplan 26-40.pdf")
+    path = _www(hass, "Testplan 26-40.pdf")
 
     with pytest.raises(ServiceValidationError) as excinfo:
         await hass.services.async_call(
@@ -246,7 +246,7 @@ async def test_supplying_both_sources_is_refused(hass: HomeAssistant, loaded_ent
 
 
 async def test_an_uploaded_file_imports(hass: HomeAssistant, loaded_entry) -> None:
-    upload = _www(hass, "uploaded.pdf", "AHS Speiseplan 26-40.pdf")
+    upload = _www(hass, "uploaded.pdf", "Testplan 26-40.pdf")
 
     @contextmanager
     def _fake_process(_hass, _file_id):
@@ -271,7 +271,7 @@ async def test_an_uploaded_file_imports(hass: HomeAssistant, loaded_entry) -> No
 async def test_every_parse_failure_preserves_stored_data(
     hass: HomeAssistant, loaded_entry, payload: bytes, reason: str
 ) -> None:
-    await _import(hass, _www(hass, "AHS Speiseplan 26-40.pdf"))
+    await _import(hass, _www(hass, "Testplan 26-40.pdf"))
     coordinator = hass.data[DOMAIN][loaded_entry.entry_id]
     before = {key: dict(value) for key, value in coordinator.store.weeks.items()}
 
@@ -291,7 +291,7 @@ async def test_every_parse_failure_preserves_stored_data(
 async def test_the_storage_file_is_byte_identical_after_a_failure(
     hass: HomeAssistant, loaded_entry, payload: bytes, reason: str
 ) -> None:
-    await _import(hass, _www(hass, "AHS Speiseplan 26-40.pdf"))
+    await _import(hass, _www(hass, "Testplan 26-40.pdf"))
     storage = Path(hass.config.path(".storage")) / f"school_menu.{loaded_entry.entry_id}"
     before = storage.read_bytes() if storage.exists() else None
     coordinator = hass.data[DOMAIN][loaded_entry.entry_id]
@@ -302,7 +302,7 @@ async def test_the_storage_file_is_byte_identical_after_a_failure(
     assert reason in str(excinfo.value)
     after = storage.read_bytes() if storage.exists() else None
     assert after == before
-    assert coordinator.store.weeks["2026-W40"]["source_file"] == "AHS Speiseplan 26-40.pdf"
+    assert coordinator.store.weeks["2026-W40"]["source_file"] == "Testplan 26-40.pdf"
 
 
 async def test_a_week_outside_retention_reports_that_it_was_not_stored(
@@ -314,7 +314,7 @@ async def test_a_week_outside_retention_reports_that_it_was_not_stored(
         freezer.move_to(f"{start.isoformat()} 09:00:00+02:00")
         await coordinator.async_import_week(_parsed(start, f"h{offset}"), source="manual")
 
-    await _import(hass, _www(hass, "AHS Speiseplan 26-39.pdf"))
+    await _import(hass, _www(hass, "Testplan 26-39.pdf"))
 
     message = _notifications(hass)[NOTIFICATION_OK_ID]["message"]
     assert "nicht gespeichert" in message

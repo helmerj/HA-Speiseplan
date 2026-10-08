@@ -129,14 +129,14 @@ async def test_a_third_school_sender_with_another_subject_is_imported(
                 KITCHEN_OFFICE,
                 "Speiseplan für nächste Woche",
                 pdf(),
-                "AHS Speiseplan 26-40.pdf",
+                "Testplan 26-40.pdf",
             )
         ]
     )
 
     await setup_mailbox(hass, school_entry, server)
 
-    assert hass.states.get(TODAY).state == "Chili sin Carne mit Sauer Sahne"
+    assert hass.states.get(TODAY).state == "Ananas-Chili mit Kidneybohnen"
     searches = [c for c in server.commands if c[0] == "uid_search"]
     assert [c[4] for c in searches] == ['"annie-heuser.schule"']
 
@@ -198,10 +198,10 @@ async def test_a_long_umlaut_sender_name_folded_by_the_mail_server_is_imported(
         ),
         subject="Speiseplan für nächste Woche",
         date="Sun, 27 Sep 2026 18:04:11 +0200",
-        attachments=[("AHS Speiseplan 26-40.pdf", pdf())],
+        attachments=[("Testplan 26-40.pdf", pdf())],
     )
     assert b"\n " in long_name.as_bytes().split(b"Subject:")[0]
 
     await setup_mailbox(hass, school_entry, FakeImapServer([long_name]))
 
-    assert hass.states.get(TODAY).state == "Chili sin Carne mit Sauer Sahne"
+    assert hass.states.get(TODAY).state == "Ananas-Chili mit Kidneybohnen"
