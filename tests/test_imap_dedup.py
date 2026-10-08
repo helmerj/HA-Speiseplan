@@ -56,13 +56,13 @@ def _by_payload(table: dict[bytes, list[str]]):
 
 
 def _with_wednesday(main: str) -> list[str]:
-    return [main if line.startswith("Chili sin Carne") else line for line in WEEK_40]
+    return [main if line.startswith("Ananas-Chili") else line for line in WEEK_40]
 
 
 def _monday_only() -> list[str]:
     return (
         WEEK_40[: WEEK_40.index("DIENSTAG")]
-        + WEEK_40[WEEK_40.index("„Das Beste in der Musik steht nicht in den Noten.“") :]
+        + WEEK_40[WEEK_40.index("„Ein voller Bauch lernt gern.“") :]
     )
 
 
@@ -79,7 +79,7 @@ async def test_a_matching_mail_updates_the_sensors(
 
     await setup_mailbox(hass, mail_entry, server)
 
-    assert hass.states.get(TODAY).state == "Chili sin Carne mit Sauer Sahne"
+    assert hass.states.get(TODAY).state == "Ananas-Chili mit Kidneybohnen"
 
 
 async def test_the_second_teachers_identical_copy_is_skipped_before_parsing(
@@ -171,7 +171,7 @@ async def test_the_newest_mail_wins_whatever_order_the_senders_are_searched_in(
         {
             b"original": WEEK_40,
             b"original, forwarded": WEEK_40,
-            b"corrected": _with_wednesday("Chili con Carne"),
+            b"corrected": _with_wednesday("Ananas-Chili mit roten Linsen"),
         }
     )
 
@@ -179,7 +179,7 @@ async def test_the_newest_mail_wins_whatever_order_the_senders_are_searched_in(
         coordinator = await setup_mailbox(hass, mail_entry, server)
         await _poll(hass, coordinator)
 
-    assert hass.states.get(TODAY).state == "Chili con Carne"
+    assert hass.states.get(TODAY).state == "Ananas-Chili mit roten Linsen"
 
 
 async def test_a_corrected_menu_for_a_known_week_overwrites(
@@ -190,12 +190,12 @@ async def test_a_corrected_menu_for_a_known_week_overwrites(
     coordinator = await setup_mailbox(hass, mail_entry, server)
     calls = _listener_calls(coordinator)
     server.messages.append(mail("2", TEACHER_A, "Speiseplan KW40", b"corrected"))
-    extract, _ = _by_payload({b"corrected": _with_wednesday("Chili con Carne")})
+    extract, _ = _by_payload({b"corrected": _with_wednesday("Ananas-Chili mit roten Linsen")})
 
     with patch(EXTRACT, extract):
         await _poll(hass, coordinator)
 
-    assert hass.states.get(TODAY).state == "Chili con Carne"
+    assert hass.states.get(TODAY).state == "Ananas-Chili mit roten Linsen"
     assert len(coordinator.store.weeks["2026-W40"]["days"]) == 5
     assert len(coordinator.store.weeks["2026-W40"]["content_hashes"]) == 2
     assert len(calls) == 1
@@ -215,7 +215,7 @@ async def test_a_mail_that_would_shrink_a_stored_week_is_refused_once(
         await _poll(hass, coordinator)
 
     assert len(coordinator.store.weeks["2026-W40"]["days"]) == 5
-    assert hass.states.get(TODAY).state == "Chili sin Carne mit Sauer Sahne"
+    assert hass.states.get(TODAY).state == "Ananas-Chili mit Kidneybohnen"
     assert parsed == [b"degraded"]
     assert caplog.text.count("Not importing degraded.pdf") == 1
     notice = _notifications(hass)[NOTIFICATION_ERROR_ID]["message"]
@@ -258,7 +258,7 @@ async def test_an_unparseable_attachment_is_reported_once_and_never_blocks_the_r
         coordinator = await setup_mailbox(hass, mail_entry, server)
         await _poll(hass, coordinator)
 
-    assert hass.states.get(TODAY).state == "Chili sin Carne mit Sauer Sahne"
+    assert hass.states.get(TODAY).state == "Ananas-Chili mit Kidneybohnen"
     assert parsed.count(b"not a pdf") == 1
     assert caplog.text.count("Not importing kaputt.pdf") == 1
     assert "kaputt.pdf" in _notifications(hass)[NOTIFICATION_ERROR_ID]["message"]
@@ -300,14 +300,14 @@ async def test_a_pdf_with_no_readable_header_falls_back_to_the_subject_week(
 ) -> None:
     freezer.move_to("2026-09-30 09:00:00+02:00")
     server = FakeImapServer([mail("1", TEACHER_A, "Speiseplan KW40", pdf())])
-    headerless = ["WOCHENPLAN", "MONTAG", "Pasta mit Tomaten Sauce dazu Parmesan (1a, 3)", "Obst"]
+    headerless = ["WOCHENPLAN", "MONTAG", "Spaghetti mit Kürbis-Salbei Sauce (1a)", "Obst"]
 
     with patch(EXTRACT, return_value=headerless):
         coordinator = await setup_mailbox(hass, mail_entry, server)
 
     assert list(coordinator.store.weeks) == ["2026-W40"]
     assert coordinator.store.weeks["2026-W40"]["days"]["2026-09-28"]["lines"][0] == (
-        "Pasta mit Tomaten Sauce dazu Parmesan"
+        "Spaghetti mit Kürbis-Salbei Sauce"
     )
 
 

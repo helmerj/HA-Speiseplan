@@ -26,14 +26,14 @@ def _raw_message(sender: str, subject: str, payload: bytes) -> bytes:
     message["Date"] = "Sun, 27 Sep 2026 18:04:11 +0200"
     message.set_content("Anbei der Speiseplan.")
     message.add_attachment(
-        payload, maintype="application", subtype="pdf", filename="AHS Speiseplan 26-40.pdf"
+        payload, maintype="application", subtype="pdf", filename="Testplan 26-40.pdf"
     )
     return message.as_bytes().replace(b"\n", b"\r\n")
 
 
 @pytest.fixture
 async def imap_server(socket_enabled) -> RealImapServer:
-    payload = (FIXTURES / "AHS Speiseplan 26-40.pdf").read_bytes()
+    payload = (FIXTURES / "Testplan 26-40.pdf").read_bytes()
     server = RealImapServer(
         messages=[
             StoredMessage(
@@ -69,8 +69,8 @@ async def test_the_real_protocol_round_trip_returns_the_attachment(
     )
 
     assert len(attachments) == 1
-    assert attachments[0].filename == "AHS Speiseplan 26-40.pdf"
-    assert attachments[0].payload == (FIXTURES / "AHS Speiseplan 26-40.pdf").read_bytes()
+    assert attachments[0].filename == "Testplan 26-40.pdf"
+    assert attachments[0].payload == (FIXTURES / "Testplan 26-40.pdf").read_bytes()
     assert attachments[0].week_number == 40
 
 
@@ -223,4 +223,4 @@ async def test_a_domain_sender_is_searched_by_domain_on_the_wire(
     searches = [c for c in imap_server.commands if "SEARCH" in c.upper()]
     assert len(searches) == 1
     assert 'FROM "annie-heuser.schule"' in searches[0]
-    assert [a.filename for a in attachments] == ["AHS Speiseplan 26-40.pdf"]
+    assert [a.filename for a in attachments] == ["Testplan 26-40.pdf"]

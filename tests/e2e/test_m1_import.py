@@ -14,8 +14,8 @@ from tests.conftest import FIXTURES
 def _stage_week_40(hass: HomeAssistant) -> Path:
     www = Path(hass.config.path("www"))
     www.mkdir(parents=True, exist_ok=True)
-    target = www / "AHS Speiseplan 26-40.pdf"
-    shutil.copyfile(FIXTURES / "AHS Speiseplan 26-40.pdf", target)
+    target = www / "Testplan 26-40.pdf"
+    shutil.copyfile(FIXTURES / "Testplan 26-40.pdf", target)
     return target
 
 
@@ -42,12 +42,12 @@ async def test_importing_a_pdf_puts_todays_lunch_on_a_sensor(hass: HomeAssistant
     await hass.async_block_till_done()
 
     state = hass.states.get(TODAY)
-    assert state.state == "Chili sin Carne mit Sauer Sahne"
+    assert state.state == "Ananas-Chili mit Kidneybohnen"
     assert state.attributes["side"] == "Reis"
-    assert state.attributes["dessert"] == "Blattsalat mit gerösteten Kernen"
+    assert state.attributes["dessert"] == "Feldsalat mit Kürbiskernen"
     assert state.attributes["weekday"] == "Mittwoch"
 
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
 
-    assert hass.states.get(TODAY).state == "Chili sin Carne mit Sauer Sahne"
+    assert hass.states.get(TODAY).state == "Ananas-Chili mit Kidneybohnen"

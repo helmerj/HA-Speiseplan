@@ -3,3 +3,4 @@ pytest-homeassistant-custom-component==0.13.366
 pypdf==6.19.0
 ruff==0.16.9
 aioimaplib==2.0.1
+reportlab==5.0.1

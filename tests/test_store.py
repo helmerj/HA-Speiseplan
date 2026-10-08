@@ -13,7 +13,7 @@ WEEK_40 = ParsedWeek(
         DayMenu(date=datetime.date(2026, 9, 28), lines=("Pasta", "Salat", "Obst")),
         DayMenu(date=datetime.date(2026, 9, 30), lines=("Chili", "Reis")),
     ),
-    source_file="AHS Speiseplan 26-40.pdf",
+    source_file="Testplan 26-40.pdf",
     content_hash="hash-40",
 )
 
@@ -86,7 +86,7 @@ async def test_provenance_is_recorded(hass: HomeAssistant) -> None:
     await store.async_save_week(WEEK_40, source="manual")
 
     record = store.weeks["2026-W40"]
-    assert record["source_file"] == "AHS Speiseplan 26-40.pdf"
+    assert record["source_file"] == "Testplan 26-40.pdf"
     assert record["source"] == "manual"
     assert record["ingested_at"]
     assert store.last_import is not None
@@ -97,8 +97,8 @@ async def test_each_day_resolves_to_its_own_weeks_record(hass: HomeAssistant) ->
     await store.async_load()
     week_39 = ParsedWeek(
         week_start=datetime.date(2026, 9, 21),
-        days=(DayMenu(date=datetime.date(2026, 9, 25), lines=("Linsen Eintopf",)),),
-        source_file="AHS Speiseplan 26-39.pdf",
+        days=(DayMenu(date=datetime.date(2026, 9, 25), lines=("Bohnen Eintopf",)),),
+        source_file="Testplan 26-39.pdf",
         content_hash="hash-39",
     )
     await store.async_save_week(week_39, source="manual")
@@ -107,8 +107,8 @@ async def test_each_day_resolves_to_its_own_weeks_record(hass: HomeAssistant) ->
     friday_39 = store.record_for_day(datetime.date(2026, 9, 25))
     monday_40 = store.record_for_day(datetime.date(2026, 9, 28))
 
-    assert friday_39["source_file"] == "AHS Speiseplan 26-39.pdf"
-    assert monday_40["source_file"] == "AHS Speiseplan 26-40.pdf"
+    assert friday_39["source_file"] == "Testplan 26-39.pdf"
+    assert monday_40["source_file"] == "Testplan 26-40.pdf"
     assert store.record_for_day(datetime.date(2026, 9, 24)) is None
 
 
@@ -154,5 +154,5 @@ async def test_a_record_with_an_unparseable_timestamp_is_ignored(hass: HomeAssis
     }
 
     assert store.latest_week_key == "2026-W40"
-    assert store.latest_record["source_file"] == "AHS Speiseplan 26-40.pdf"
+    assert store.latest_record["source_file"] == "Testplan 26-40.pdf"
     assert store.last_import is not None

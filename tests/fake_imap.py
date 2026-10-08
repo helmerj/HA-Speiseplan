@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from email.message import EmailMessage
-from pathlib import Path
 
-FIXTURES = Path(__file__).parent / "fixtures"
+from tests.pdf_fixtures import FIXTURES, WEEK_40
+
 TEACHER_A = "Maximilian.Stollberg@annie-heuser.schule"
 TEACHER_B = "Lena.Putzmann@annie-heuser.schule"
 MAILBOX = {
@@ -181,7 +181,7 @@ class FakeImapClient:
         return FakeResponse("OK", [])
 
 
-def pdf(name: str = "AHS Speiseplan 26-40.pdf") -> bytes:
+def pdf(name: str = WEEK_40) -> bytes:
     return (FIXTURES / name).read_bytes()
 
 

@@ -4,53 +4,21 @@ import datetime
 
 import pytest
 
+from custom_components.school_menu.cleaning import clean_line
 from custom_components.school_menu.models import MenuParseError
 from custom_components.school_menu.parser import extract_lines, parse_lines
+from tests.pdf_fixtures import WEEK_40, menu_lines
 
-WEEK_40_LINES = [
-    "WOCHENPLAN",
-    "28.09.26 – 02.10.26",
-    "MONTAG",
-    "Pasta mit Tomaten Sauce dazu Parmesan (1a, 3)",
-    "Blattsalat mit gerösteten Kernen (4)",
-    "Obst",
-    "DIENSTAG",
-    "Kartoffel Gratin (3)",
-    "Rotebeete-Apfel Salat (4)",
-    "Erdbeere Joghurt (3)",
-    "MITTWOCH",
-    "Chili sin Carne mit Sauer Sahne (3)",
-    "Reis",
-    "Blattsalat mit gerösteten Kernen (4)",
-    "DONNERSTAG",
-    "Blumenkohl-Brokkoli-Möhre mit Käse überbacken (3)",
-    "Kartoffeln",
-    "Obst",
-    "FREITAG",
-    "Lauch-Kartoffel Suppe (2)",
-    "Brot (1a)",
-    "Bananen Kuchen (1a)",
-    "„Das Beste in der Musik steht nicht in den Noten.“",
-    "Gustav Mahler",
-    "(Änderung Vorbehalten)",
-    "Allergene und Zusatzstoffe: Gluten (1), Weizen (1a), Dinkel (1b)",
-    "Konservierungsstoff: Natriumnitrit(a)",
-    "Organiced Kitchen Bio Catering 030-32293872 waldorf-charlottenburg@organiced-kitchen.de",
-]
+WEEK_40_LINES = menu_lines(WEEK_40)
+THURSDAY = "Süßer DONNERSTAG"
 
 
 def _parse(lines: list[str], **kwargs):
     return parse_lines(lines, source_file="test.pdf", content_hash="deadbeef", **kwargs)
 
 
-def test_extract_lines_reads_the_real_pdf(week_40_pdf: bytes) -> None:
-    lines = extract_lines(week_40_pdf)
-
-    assert lines[0] == "WOCHENPLAN"
-    assert lines[1] == "28.09.26 – 02.10.26"
-    assert "MONTAG" in lines
-    assert "FREITAG" in lines
-    assert all(line == line.strip() and line for line in lines)
+def test_extract_lines_reads_a_menu_pdf_line_by_line(week_40_pdf: bytes) -> None:
+    assert extract_lines(week_40_pdf) == WEEK_40_LINES
 
 
 def test_extract_lines_rejects_a_pdf_without_a_text_layer() -> None:
@@ -59,24 +27,24 @@ def test_extract_lines_rejects_a_pdf_without_a_text_layer() -> None:
     assert excinfo.value.reason == "no_text_layer"
 
 
-def test_the_real_week_parses_to_five_days(week_40_pdf: bytes) -> None:
+def test_a_menu_pdf_parses_to_five_days(week_40_pdf: bytes) -> None:
     week = parse_lines(
-        extract_lines(week_40_pdf), source_file="AHS Speiseplan 26-40.pdf", content_hash="abc"
+        extract_lines(week_40_pdf), source_file="Testplan 26-40.pdf", content_hash="abc"
     )
 
     assert week.week_start == datetime.date(2026, 9, 28)
     assert len(week.days) == 5
     assert week.days[0].date == datetime.date(2026, 9, 28)
-    assert week.days[0].main == "Pasta mit Tomaten Sauce dazu Parmesan"
+    assert week.days[0].main == "Spaghetti mit Kürbis-Salbei Sauce"
     assert week.days[2].lines == (
-        "Chili sin Carne mit Sauer Sahne",
+        "Ananas-Chili mit Kidneybohnen",
         "Reis",
-        "Blattsalat mit gerösteten Kernen",
+        "Feldsalat mit Kürbiskernen",
     )
     assert week.days[4].date == datetime.date(2026, 10, 2)
 
 
-def test_both_real_pdfs_carry_no_allergen_codes(week_39_pdf: bytes, week_40_pdf: bytes) -> None:
+def test_both_menu_pdfs_carry_no_allergen_codes(week_39_pdf: bytes, week_40_pdf: bytes) -> None:
     for raw in (week_39_pdf, week_40_pdf):
         week = parse_lines(extract_lines(raw), source_file="x.pdf", content_hash="h")
         for day in week.days:
@@ -88,15 +56,15 @@ def test_the_footer_never_leaks_into_friday(week_39_pdf: bytes) -> None:
     week = parse_lines(extract_lines(week_39_pdf), source_file="x.pdf", content_hash="h")
 
     friday = week.days[4]
-    assert friday.lines == ("Linsen Eintopf", "Brot", "Brownie")
+    assert friday.lines == ("Bohnen Eintopf", "Brot", "Apfel Crumble")
 
 
 def test_a_wrapped_quote_is_still_treated_as_footer() -> None:
-    lines = [*WEEK_40_LINES[:22], "„Der Verstand kann uns sagen, was wir", "sen.“", "Joseph."]
+    lines = [*WEEK_40_LINES[:22], "„Wer mit Freude kocht, braucht kein", "Rezept.“", "Tante Erna"]
 
     week = _parse(lines)
 
-    assert week.days[4].lines == ("Lauch-Kartoffel Suppe", "Brot", "Bananen Kuchen")
+    assert week.days[4].lines == ("Kürbis-Kokos Suppe", "Dinkelbrot", "Haferkekse")
 
 
 def test_a_day_with_two_lines_has_no_dessert() -> None:
@@ -104,10 +72,7 @@ def test_a_day_with_two_lines_has_no_dessert() -> None:
 
     week = _parse(lines)
 
-    assert week.days[0].lines == (
-        "Pasta mit Tomaten Sauce dazu Parmesan",
-        "Blattsalat mit gerösteten Kernen",
-    )
+    assert week.days[0].lines == ("Spaghetti mit Kürbis-Salbei Sauce", "Gurkensalat mit Dill")
     assert week.days[0].dessert is None
 
 
@@ -118,7 +83,7 @@ def test_a_day_with_four_lines_keeps_all_of_them(caplog: pytest.LogCaptureFixtur
     week = _parse(lines)
 
     assert len(week.days[0].lines) == 4
-    assert week.days[0].main == "Pasta mit Tomaten Sauce dazu Parmesan"
+    assert week.days[0].main == "Spaghetti mit Kürbis-Salbei Sauce"
     assert week.days[0].dessert == "Obst"
     assert "MONTAG" in caplog.text
 
@@ -127,7 +92,8 @@ def test_a_day_anchor_with_no_lines_is_omitted(caplog: pytest.LogCaptureFixture)
     lines = [
         line
         for line in WEEK_40_LINES
-        if line not in {"Kartoffel Gratin (3)", "Rotebeete-Apfel Salat (4)", "Erdbeere Joghurt (3)"}
+        if line
+        not in {"Süßkartoffel Auflauf (3)", "Rotkohl-Birnen Rohkost (4)", "Vanille Joghurt (3)"}
     ]
 
     week = _parse(lines)
@@ -197,10 +163,10 @@ def test_a_missing_day_anchor_does_not_shift_later_days_onto_it() -> None:
         for line in WEEK_40_LINES
         if line
         not in {
-            "MITTWOCH",
-            "Chili sin Carne mit Sauer Sahne (3)",
+            "Süß-saurer MITTWOCH",
+            "Ananas-Chili mit Kidneybohnen (7)",
             "Reis",
-            "Blattsalat mit gerösteten Kernen (4)",
+            "Feldsalat mit Kürbiskernen (4)",
         }
     ]
 
@@ -208,10 +174,8 @@ def test_a_missing_day_anchor_does_not_shift_later_days_onto_it() -> None:
 
     by_date = {day.date: day for day in week.days}
     assert datetime.date(2026, 9, 30) not in by_date
-    assert by_date[datetime.date(2026, 10, 1)].main == (
-        "Blumenkohl-Brokkoli-Möhre mit Käse überbacken"
-    )
-    assert by_date[datetime.date(2026, 10, 2)].main == "Lauch-Kartoffel Suppe"
+    assert by_date[datetime.date(2026, 10, 1)].main == "Zucchini-Möhren Puffer mit Kräuterquark"
+    assert by_date[datetime.date(2026, 10, 2)].main == "Kürbis-Kokos Suppe"
 
 
 @pytest.mark.parametrize(
@@ -220,15 +184,15 @@ def test_a_missing_day_anchor_does_not_shift_later_days_onto_it() -> None:
         "(Änderung Vorbehalten)",
         "Allergene und Zusatzstoffe: Gluten (1), Weizen (1a)",
         "Konservierungsstoff: Natriumnitrit(a)",
-        "Organiced Kitchen Bio Catering www.organiced-kitchen.de",
+        "Testküche Bio Catering kantine@organiced-kitchen.example",
     ],
 )
 def test_each_footer_sentinel_stops_friday(terminator: str) -> None:
-    lines = [*WEEK_40_LINES[:22], terminator, "Gustav Mahler", "Noch mehr Fliesstext"]
+    lines = [*WEEK_40_LINES[:22], terminator, "Opa Hubert", "Noch mehr Fliesstext"]
 
     week = _parse(lines)
 
-    assert week.days[4].lines == ("Lauch-Kartoffel Suppe", "Brot", "Bananen Kuchen")
+    assert week.days[4].lines == ("Kürbis-Kokos Suppe", "Dinkelbrot", "Haferkekse")
 
 
 def test_a_day_is_capped_at_five_lines() -> None:
@@ -248,3 +212,88 @@ def test_an_impossible_header_date_is_ignored() -> None:
     with pytest.raises(MenuParseError) as excinfo:
         _parse(lines)
     assert excinfo.value.reason == "no_date_range"
+
+
+def test_prefixed_anchors_in_menu_pdfs_keep_their_own_menus(
+    week_39_pdf: bytes, week_40_pdf: bytes
+) -> None:
+    week_39 = parse_lines(extract_lines(week_39_pdf), source_file="x.pdf", content_hash="a")
+    week_40 = parse_lines(extract_lines(week_40_pdf), source_file="y.pdf", content_hash="b")
+
+    by_date = {day.date: day for day in (*week_39.days, *week_40.days)}
+    assert len(by_date) == 10
+    assert by_date[datetime.date(2026, 9, 24)].main == "Pfannkuchen mit Blaubeeren"
+    assert by_date[datetime.date(2026, 9, 23)].lines == (
+        "Hirse-Gemüse Pfanne / Frische Kräuter",
+        "Couscous",
+        "Radieschen Salat",
+    )
+    assert by_date[datetime.date(2026, 9, 28)].main == "Spaghetti mit Kürbis-Salbei Sauce"
+    assert by_date[datetime.date(2026, 9, 30)].main == "Ananas-Chili mit Kidneybohnen"
+    assert by_date[datetime.date(2026, 10, 1)].lines == (
+        "Zucchini-Möhren Puffer mit Kräuterquark",
+        "Kartoffeln",
+        "Obst",
+    )
+
+
+@pytest.mark.parametrize(
+    "anchor",
+    [
+        "DONNERSTAG",
+        "SÜSSER DONNERSTAG",
+        "SÜßER DONNERSTAG",
+        "Bunter veganer DONNERSTAG",
+        "Süß-saurer DONNERSTAG",
+        "Süßer  DONNERSTAG",
+    ],
+)
+def test_a_day_name_with_a_prefix_is_still_an_anchor(anchor: str) -> None:
+    lines = [anchor if line == THURSDAY else line for line in WEEK_40_LINES]
+
+    week = _parse(lines)
+
+    by_date = {day.date: day for day in week.days}
+    assert len(week.days) == 5
+    assert by_date[datetime.date(2026, 9, 30)].lines == (
+        "Ananas-Chili mit Kidneybohnen",
+        "Reis",
+        "Feldsalat mit Kürbiskernen",
+    )
+    assert by_date[datetime.date(2026, 10, 1)].main == "Zucchini-Möhren Puffer mit Kräuterquark"
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Reste vom Donnerstag",
+        "DONNERSTAGS",
+        "Kuchen (1a) DONNERSTAG",
+        "Reste vom Mittwoch und DONNERSTAG",
+        "DONNERSTAG Spezial",
+    ],
+)
+def test_a_dish_line_mentioning_a_day_is_not_an_anchor(line: str) -> None:
+    lines = [line if entry == THURSDAY else entry for entry in WEEK_40_LINES]
+
+    week = _parse(lines)
+
+    dates = {day.date for day in week.days}
+    assert datetime.date(2026, 10, 1) not in dates
+    wednesday = next(day for day in week.days if day.date == datetime.date(2026, 9, 30))
+    assert clean_line(line) in wednesday.lines
+
+
+def test_out_of_order_prefixed_anchors_are_an_error() -> None:
+    lines = [
+        "WOCHENPLAN",
+        "28.09.26 – 02.10.26",
+        "Süßer DONNERSTAG",
+        "Pfannkuchen",
+        "MONTAG",
+        "Spaghetti",
+    ]
+
+    with pytest.raises(MenuParseError) as excinfo:
+        _parse(lines)
+    assert excinfo.value.reason == "day_order"

@@ -21,7 +21,7 @@ def _stage(hass: HomeAssistant, name: str) -> Path:
 
 
 def _stage_week_40(hass: HomeAssistant) -> Path:
-    return _stage(hass, "AHS Speiseplan 26-40.pdf")
+    return _stage(hass, "Testplan 26-40.pdf")
 
 
 TODAY = "sensor.school_menu_today"
@@ -42,15 +42,15 @@ async def _setup_with_week_40(hass: HomeAssistant, entry: MockConfigEntry) -> No
 @pytest.mark.parametrize(
     ("now", "expected_main", "expected_weekday"),
     [
-        ("2026-09-28 10:00:00+02:00", "Pasta mit Tomaten Sauce dazu Parmesan", "Montag"),
-        ("2026-09-29 10:00:00+02:00", "Kartoffel Gratin", "Dienstag"),
-        ("2026-09-30 10:00:00+02:00", "Chili sin Carne mit Sauer Sahne", "Mittwoch"),
+        ("2026-09-28 10:00:00+02:00", "Spaghetti mit Kürbis-Salbei Sauce", "Montag"),
+        ("2026-09-29 10:00:00+02:00", "Süßkartoffel Auflauf", "Dienstag"),
+        ("2026-09-30 10:00:00+02:00", "Ananas-Chili mit Kidneybohnen", "Mittwoch"),
         (
             "2026-10-01 10:00:00+02:00",
-            "Blumenkohl-Brokkoli-Möhre mit Käse überbacken",
+            "Zucchini-Möhren Puffer mit Kräuterquark",
             "Donnerstag",
         ),
-        ("2026-10-02 10:00:00+02:00", "Lauch-Kartoffel Suppe", "Freitag"),
+        ("2026-10-02 10:00:00+02:00", "Kürbis-Kokos Suppe", "Freitag"),
     ],
 )
 async def test_every_school_day_reports_its_main(
@@ -103,7 +103,7 @@ async def test_the_side_and_dessert_are_positional(
 
     attributes = hass.states.get(TODAY).attributes
     assert attributes["side"] == "Reis"
-    assert attributes["dessert"] == "Blattsalat mit gerösteten Kernen"
+    assert attributes["dessert"] == "Feldsalat mit Kürbiskernen"
 
 
 async def test_provenance_reaches_the_attributes(
@@ -113,7 +113,7 @@ async def test_provenance_reaches_the_attributes(
     await _setup_with_week_40(hass, config_entry)
 
     attributes = hass.states.get(TODAY).attributes
-    assert attributes["source_file"] == "AHS Speiseplan 26-40.pdf"
+    assert attributes["source_file"] == "Testplan 26-40.pdf"
     assert attributes["ingested_at"]
     assert attributes["date"] == datetime.date(2026, 9, 28).isoformat()
 
@@ -126,7 +126,7 @@ async def test_each_day_reports_its_own_weeks_provenance(
     assert await hass.config_entries.async_setup(config_entry.entry_id)
     await hass.async_block_till_done()
 
-    for name in ("AHS Speiseplan 26-39.pdf", "AHS Speiseplan 26-40.pdf"):
+    for name in ("Testplan 26-39.pdf", "Testplan 26-40.pdf"):
         target = _stage(hass, name)
         await hass.services.async_call(
             DOMAIN, SERVICE_IMPORT_PDF, {"file_path": str(target)}, blocking=True
@@ -134,8 +134,8 @@ async def test_each_day_reports_its_own_weeks_provenance(
     await hass.async_block_till_done()
 
     state = hass.states.get(TODAY)
-    assert state.state == "Linsen Eintopf"
-    assert state.attributes["source_file"] == "AHS Speiseplan 26-39.pdf"
+    assert state.state == "Bohnen Eintopf"
+    assert state.attributes["source_file"] == "Testplan 26-39.pdf"
 
 
 async def test_a_stored_day_with_no_lines_reports_no_menu(
@@ -205,7 +205,7 @@ async def test_an_unchanged_reimport_does_not_move_last_import(
     assert await coordinator.async_import_week(resaved, source="manual") is False
 
     assert coordinator.store.weeks["2026-W40"]["ingested_at"] == before
-    assert coordinator.store.weeks["2026-W40"]["source_file"] == "AHS Speiseplan 26-40.pdf"
+    assert coordinator.store.weeks["2026-W40"]["source_file"] == "Testplan 26-40.pdf"
     assert coordinator.store.weeks["2026-W40"]["content_hashes"][-1] == "different-bytes"
 
 
@@ -255,7 +255,7 @@ async def test_entity_ids_stay_fixed_whatever_the_entry_is_called(
         "sensor.school_menu_today",
     ]
     assert hass.states.get("sensor.school_menu_today").state == (
-        "Pasta mit Tomaten Sauce dazu Parmesan"
+        "Spaghetti mit Kürbis-Salbei Sauce"
     )
 
 

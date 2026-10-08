@@ -158,11 +158,11 @@ custom_components/school_menu/
 └── manifest.json        requirements: ["pypdf==6.19.0"], dependencies: ["file_upload"]
 
 tests/
-├── conftest.py          hass fixtures, sample-PDF fixtures, frozen-clock helper.
-├── fixtures/
-│   ├── AHS Speiseplan 26-39.pdf     real sample — covers extract_lines end-to-end
-│   └── AHS Speiseplan 26-40.pdf     real sample
-├── test_parser.py       extract_lines against the real PDFs; parse_lines against string lists.
+├── conftest.py          hass fixtures, menu-PDF fixtures, frozen-clock helper.
+├── pdf_fixtures.py      two made-up weeks (KW39, KW40) as data, built into PDFs at test time (reportlab).
+├── fixtures/            real caterer PDFs, local only: git-ignored, never committed.
+├── test_real_pdfs.py    local smoke test over fixtures/*.pdf; an empty set skips (CI).
+├── test_parser.py       extract_lines against the menu PDFs; parse_lines against string lists.
 ├── test_cleaning.py     Allergen stripping, umlauts, whitespace and "/" normalisation.
 ├── test_date_logic.py   Rollover, Friday→Monday, weekend, DST, year boundary.
 ├── test_store.py        Upsert/overwrite, hash ledger, 4-week prune, migration.
@@ -317,8 +317,16 @@ rather than a binary fixture (§10 R12). Algorithm, in order:
    other four as `+1..+4` days (year-boundary safe). Two-digit years resolve via `%y` (26 → 2026).
    If the start date is not a Monday, normalise back to that week's Monday and log.
    No header → use `fallback_week_start`; if that is also absent → `MenuParseError("no_date_range")`.
-2. Locate day anchors `MONTAG|DIENSTAG|MITTWOCH|DONNERSTAG|FREITAG` as whole uppercase lines, in order.
+2. Locate day anchors `MONTAG|DIENSTAG|MITTWOCH|DONNERSTAG|FREITAG`, in order. An anchor is a line whose
+   last word is the uppercase day name, optionally preceded by up to three letter-only words (hyphens
+   allowed, no digits or punctuation) in any case.
    Zero anchors → `MenuParseError("no_day_anchors")`. Out-of-order anchors → `MenuParseError("day_order")`.
+   **Amendment 2026-10-08 (HAS-3):** v2 required the day name as the whole line. Week 26-41 themed
+   Thursday as `Süßer DONNERSTAG` (printed in capitals as `SÜSSER DONNERSTAG`; pypdf extracts the typed
+   text), so Thursday's lines were absorbed into Wednesday and Thursday vanished. The prefix is only
+   used to find the day and is discarded. The day name itself must stay uppercase and last on the line,
+   and the prefix is capped and letter-only, so a dish line such as `Reste vom Donnerstag` or
+   `Kuchen (1a) DONNERSTAG` never becomes an anchor.
 3. For each anchor, take lines until the next anchor **or until a footer sentinel**, whichever comes first.
    Footer sentinels (required because FREITAG is followed directly by the quote with no blank line):
    a line starting `„`, the exact line `(Änderung Vorbehalten)`, a line starting `Allergene und Zusatzstoffe`,
@@ -570,12 +578,20 @@ Credentials never appear in logs, notifications, attributes, or diagnostics (`TO
 
 **Unit — pure, no `hass`:**
 - `test_parser.py`
-  - `extract_lines`: both real PDFs → the exact expected line sequence (this is the only pypdf coverage).
+  - `extract_lines`: both menu PDFs → the exact expected line sequence (this is the only pypdf coverage in CI).
   - `parse_lines` against **string lists**, not fixture PDFs (§10 R12): a day with 2 lines → `dessert is None`;
     a day with 4 lines → all 4 in `lines`, warning logged, accessors unchanged; a day anchor with 0 lines →
     omitted, no error, warning logged; missing header range with and without `fallback_week_start`;
     non-Monday start date; out-of-order anchors; empty input → `MenuParseError` with the right reason;
     footer never leaks into FREITAG (quote, `(Änderung Vorbehalten)`, allergen legend, contact line).
+- **Amendment 2026-10-08 (HAS-3) — no real PDFs in git.** The caterer's PDFs stay out of the repository.
+  Every test reads two made-up weeks from `tests/pdf_fixtures.py`, on the dates of the former samples
+  (KW39 21.–25.09.26, KW40 28.09.–02.10.26). They copy the real layout (header range, allergen codes,
+  `/` spacing, a wrapped `„…“` quote, the footer sentinels) and carry prefixed anchors (`Süßer DONNERSTAG`,
+  `SÜSSER DONNERSTAG`, `Bunter veganer MONTAG`, `Süß-saurer MITTWOCH`). The PDFs are generated with
+  reportlab when the tests start, so data and file cannot drift. `extract_lines` coverage in CI therefore
+  comes from reportlab PDFs; the caterer's own layout is checked by `test_real_pdfs.py`, which runs only
+  where real PDFs sit in `tests/fixtures/`. R12 is unchanged: `parse_lines` cases remain string lists.
 - `test_cleaning.py`: `(1a, 3)`/`(4)`/`(3, 7)` stripped; `(vegan)`/`(scharf)` preserved; umlauts intact;
   whitespace and `/` spacing normalised; the allergen legend line is *not* mangled if it ever reaches cleaning.
 - `test_date_logic.py`: every weekday → correct today/tomorrow target; **Fri/Sat/Sun all → Monday**;
