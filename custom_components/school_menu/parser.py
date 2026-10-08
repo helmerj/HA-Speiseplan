@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import re
 from io import BytesIO
 
 from .cleaning import clean_line
@@ -11,6 +12,11 @@ from .models import DayMenu, MenuParseError, ParsedWeek
 _LOGGER = logging.getLogger(__name__)
 
 DAY_ANCHORS = ("MONTAG", "DIENSTAG", "MITTWOCH", "DONNERSTAG", "FREITAG")
+MAX_ANCHOR_PREFIX_WORDS = 3
+_PREFIX_WORD = r"[^\W\d_]+(?:-[^\W\d_]+)*"
+_ANCHOR_PATTERN = re.compile(
+    rf"(?:{_PREFIX_WORD}\s+){{0,{MAX_ANCHOR_PREFIX_WORDS}}}({'|'.join(DAY_ANCHORS)})"
+)
 FOOTER_PREFIXES = (
     "„",
     "(Änderung Vorbehalten)",
@@ -42,8 +48,18 @@ def _is_footer(line: str) -> bool:
     )
 
 
+def _day_anchor(line: str) -> str | None:
+    match = _ANCHOR_PATTERN.fullmatch(line)
+    return match.group(1) if match else None
+
+
 def _anchor_positions(lines: list[str]) -> list[tuple[int, str]]:
-    return [(index, line) for index, line in enumerate(lines) if line in DAY_ANCHORS]
+    positions: list[tuple[int, str]] = []
+    for index, line in enumerate(lines):
+        day = _day_anchor(line)
+        if day is not None:
+            positions.append((index, day))
+    return positions
 
 
 def _resolve_week_start(

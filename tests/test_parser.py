@@ -4,6 +4,7 @@ import datetime
 
 import pytest
 
+from custom_components.school_menu.cleaning import clean_line
 from custom_components.school_menu.models import MenuParseError
 from custom_components.school_menu.parser import extract_lines, parse_lines
 
@@ -248,3 +249,86 @@ def test_an_impossible_header_date_is_ignored() -> None:
     with pytest.raises(MenuParseError) as excinfo:
         _parse(lines)
     assert excinfo.value.reason == "no_date_range"
+
+
+def test_a_prefixed_thursday_in_the_real_pdf_keeps_its_own_menu(week_41_pdf: bytes) -> None:
+    week = parse_lines(
+        extract_lines(week_41_pdf), source_file="AHS Speiseplan 26-41.pdf", content_hash="abc"
+    )
+
+    by_date = {day.date: day for day in week.days}
+    assert len(week.days) == 5
+    assert by_date[datetime.date(2026, 10, 7)].lines == (
+        "Gemüse-Bohnen Brätlinge",
+        "Kartoffel Stapf",
+        "Remoulade",
+    )
+    assert by_date[datetime.date(2026, 10, 8)].lines == (
+        "Milchreis",
+        "Apfelmus / Zimt und Zucker",
+        "Kartoffeln Süppchen",
+    )
+
+
+@pytest.mark.parametrize(
+    "anchor",
+    [
+        "Süßer DONNERSTAG",
+        "SÜSSER DONNERSTAG",
+        "SÜßER DONNERSTAG",
+        "Bunter veganer DONNERSTAG",
+        "Süß-saurer DONNERSTAG",
+        "Süßer  DONNERSTAG",
+    ],
+)
+def test_a_day_name_with_a_prefix_is_still_an_anchor(anchor: str) -> None:
+    lines = [anchor if line == "DONNERSTAG" else line for line in WEEK_40_LINES]
+
+    week = _parse(lines)
+
+    by_date = {day.date: day for day in week.days}
+    assert len(week.days) == 5
+    assert by_date[datetime.date(2026, 9, 30)].lines == (
+        "Chili sin Carne mit Sauer Sahne",
+        "Reis",
+        "Blattsalat mit gerösteten Kernen",
+    )
+    assert by_date[datetime.date(2026, 10, 1)].main == (
+        "Blumenkohl-Brokkoli-Möhre mit Käse überbacken"
+    )
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Reste vom Donnerstag",
+        "DONNERSTAGS",
+        "Kuchen (1a) DONNERSTAG",
+        "Reste vom Mittwoch und DONNERSTAG",
+        "DONNERSTAG Spezial",
+    ],
+)
+def test_a_dish_line_mentioning_a_day_is_not_an_anchor(line: str) -> None:
+    lines = [line if entry == "DONNERSTAG" else entry for entry in WEEK_40_LINES]
+
+    week = _parse(lines)
+
+    dates = {day.date for day in week.days}
+    assert datetime.date(2026, 10, 1) not in dates
+    wednesday = next(day for day in week.days if day.date == datetime.date(2026, 9, 30))
+    assert clean_line(line) in wednesday.lines
+
+
+def test_out_of_order_prefixed_anchors_are_an_error() -> None:
+    lines = [
+        "WOCHENPLAN",
+        "28.09.26 – 02.10.26",
+        "Süßer DONNERSTAG",
+        "Milchreis",
+        "MONTAG",
+        "Pasta",
+    ]
+
+    with pytest.raises(MenuParseError) as excinfo:
+        _parse(lines)
+    assert excinfo.value.reason == "day_order"

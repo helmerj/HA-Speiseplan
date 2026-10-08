@@ -33,6 +33,11 @@ def week_40_pdf() -> bytes:
 
 
 @pytest.fixture
+def week_41_pdf() -> bytes:
+    return (FIXTURES / "AHS Speiseplan 26-41.pdf").read_bytes()
+
+
+@pytest.fixture
 def config_entry() -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,

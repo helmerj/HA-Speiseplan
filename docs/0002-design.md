@@ -317,8 +317,16 @@ rather than a binary fixture (§10 R12). Algorithm, in order:
    other four as `+1..+4` days (year-boundary safe). Two-digit years resolve via `%y` (26 → 2026).
    If the start date is not a Monday, normalise back to that week's Monday and log.
    No header → use `fallback_week_start`; if that is also absent → `MenuParseError("no_date_range")`.
-2. Locate day anchors `MONTAG|DIENSTAG|MITTWOCH|DONNERSTAG|FREITAG` as whole uppercase lines, in order.
+2. Locate day anchors `MONTAG|DIENSTAG|MITTWOCH|DONNERSTAG|FREITAG`, in order. An anchor is a line whose
+   last word is the uppercase day name, optionally preceded by up to three letter-only words (hyphens
+   allowed, no digits or punctuation) in any case.
    Zero anchors → `MenuParseError("no_day_anchors")`. Out-of-order anchors → `MenuParseError("day_order")`.
+   **Amendment 2026-10-08 (HAS-3):** v2 required the day name as the whole line. Week 26-41 themed
+   Thursday as `Süßer DONNERSTAG` (printed in capitals as `SÜSSER DONNERSTAG`; pypdf extracts the typed
+   text), so Thursday's lines were absorbed into Wednesday and Thursday vanished. The prefix is only
+   used to find the day and is discarded. The day name itself must stay uppercase and last on the line,
+   and the prefix is capped and letter-only, so a dish line such as `Reste vom Donnerstag` or
+   `Kuchen (1a) DONNERSTAG` never becomes an anchor.
 3. For each anchor, take lines until the next anchor **or until a footer sentinel**, whichever comes first.
    Footer sentinels (required because FREITAG is followed directly by the quote with no blank line):
    a line starting `„`, the exact line `(Änderung Vorbehalten)`, a line starting `Allergene und Zusatzstoffe`,
