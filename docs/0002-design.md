@@ -837,3 +837,11 @@ entity ignores `homeassistant.update_entity`. A release could therefore go unsee
   brands-repo PR. No `logo.png`: HA falls back to the icon. Whether the HACS store tiles use local brand
   images is unverified, so the README also opens with the icon (absolute raw GitHub URL, which HACS
   renders). The `hacs/action` `brands` ignore stays until that check is known to accept local images.
+
+**Amendment 2026-10-08 (b) — a manual import always re-reads the file (HAS-5).** Layer 2 of §5.5 (skip
+known content hashes) applied to `import_pdf` as well, so a PDF first stored by an older parser could
+never be corrected: the same bytes were skipped before parsing mattered. Found with week 26-41 after the
+HAS-3 fix. The hash short-circuit now applies to the **IMAP path only**, where it exists to absorb the
+second teacher's copy. A manual import always compares the parsed lines with the stored week: identical
+lines still report "unverändert" and record nothing new; different lines overwrite the week and fan out.
+The hash is not recorded twice. Ships in 0.3.0.
