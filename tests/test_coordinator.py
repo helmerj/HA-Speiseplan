@@ -61,3 +61,32 @@ async def test_changed_content_for_a_known_week_overwrites_and_fans_out(
     assert updates
     assert coordinator.menu_for(datetime.date(2026, 9, 28)).main == "Reis"
     assert coordinator.store.weeks["2026-W40"]["content_hashes"] == ["a", "c"]
+
+
+async def test_a_manual_reimport_of_known_bytes_replaces_a_changed_parse(
+    hass: HomeAssistant, config_entry
+) -> None:
+    coordinator = await _coordinator(hass, config_entry)
+    await coordinator.async_import_week(_week("a", main="Gemüse Pfanne"), source="imap")
+    updates: list[None] = []
+    coordinator.async_add_listener(lambda: updates.append(None))
+
+    imported = await coordinator.async_import_week(_week("a", main="Milchreis"), source="manual")
+
+    assert imported is True
+    assert updates
+    assert coordinator.menu_for(datetime.date(2026, 9, 28)).main == "Milchreis"
+    assert coordinator.store.weeks["2026-W40"]["content_hashes"] == ["a"]
+    assert coordinator.store.weeks["2026-W40"]["source"] == "manual"
+
+
+async def test_the_mailbox_still_skips_known_bytes_even_if_the_parse_changed(
+    hass: HomeAssistant, config_entry
+) -> None:
+    coordinator = await _coordinator(hass, config_entry)
+    await coordinator.async_import_week(_week("a", main="Gemüse Pfanne"), source="manual")
+
+    imported = await coordinator.async_import_week(_week("a", main="Milchreis"), source="imap")
+
+    assert imported is False
+    assert coordinator.menu_for(datetime.date(2026, 9, 28)).main == "Gemüse Pfanne"

@@ -202,7 +202,7 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
         await self.async_import_week(week, source=SOURCE_IMAP)
 
     async def async_import_week(self, week: ParsedWeek, *, source: str) -> bool:
-        if self.store.knows_hash(week.content_hash):
+        if source == SOURCE_IMAP and self.store.knows_hash(week.content_hash):
             _LOGGER.debug("Skipping %s, content hash already stored", week.source_file)
             return False
 
