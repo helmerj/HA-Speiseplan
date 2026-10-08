@@ -146,6 +146,8 @@ custom_components/school_menu/
 │                        (M2: IMAP host/port/user/pass/folder/senders/subject/interval).
 ├── sensor.py            SchoolMenuSensor ×2 (today, next_school_day) + LastImportSensor (diagnostic).
 │                        Pure projection of coordinator state; CoordinatorEntity subclasses.
+├── update.py            SchoolMenuUpdate: GitHub release check every 6 h, install via HACS (HAS-4).
+├── brand/               icon.png, dark_icon.png and @2x variants (HAS-4).
 ├── date_logic.py        Pure. target_date(today, which), weekday naming, week derivation.
 ├── imap_client.py       (M2) aioimaplib client: connect, SINCE+FROM search, BODY.PEEK fetch,
 │                        RFC 2047 subject decode, KW extraction, PDF attachment extraction.
@@ -800,3 +802,38 @@ different subject. Plan: `docs/plans/school-domain-senders.md`.
 - **Domain entries** stay ASCII hostnames with a letters-only TLD; punycode TLDs (`xn--…`) are not
   supported, accepted as a non-issue for a school domain.
 
+
+**Amendment 2026-10-08 — release notice, install hand-over and brand images (HAS-4).**
+HACS refreshes a *custom* repository only at Home Assistant start and every 48 h, and its own update
+entity ignores `homeassistant.update_entity`. A release could therefore go unseen for two days.
+
+- **`update.school_menu_version`** (`update.py`, translation key `version`, on the service device).
+  It polls `GET https://api.github.com/repos/helmerj/HA-Speiseplan/releases/latest` every **6 h**
+  (`SCAN_INTERVAL`), plus once in the background right after it is added; setup never waits on GitHub.
+  That endpoint already excludes drafts and pre-releases. `installed_version` is the loaded
+  `manifest.json` version; `latest_version` is `tag_name` without its leading `v`; `release_url` is
+  `html_url`; release notes are the release `body`. Request timeout 10 s, headers
+  `Accept: application/vnd.github+json` and a `User-Agent`. No token, so the anonymous limit of
+  60 requests/h is never approached.
+- **Failure handling.** Network error, timeout, any non-200 (403/429 rate limit, 404 before the first
+  release) or a malformed body: keep the last known `latest_version` (unknown before the first success),
+  `DEBUG` log only, never raise, never notify. A flaky GitHub must not produce noise.
+- **Install hands over to HACS.** Features `INSTALL | RELEASE_NOTES`; without `INSTALL` the Settings
+  update card and badge ignore the entity (frontend filter `updateCanInstall`). `async_install` looks up
+  HACS's update entity for this repository in the entity registry (platform `hacs`, unique id = the
+  GitHub repository id `1389147095`) and calls `update.install` on it with the exact release tag
+  (HACS supports `SPECIFIC_VERSION`). HACS absent, or HACS failing: `HomeAssistantError` with a
+  translated "install via HACS" message. Restart afterwards is HACS's usual repair prompt. Accepted
+  duplicate: once HACS's own 48 h refresh catches up, Settings lists the same release twice.
+- **One-time notification.** When the entity turns `on` (newer, not skipped) for a version not yet
+  announced, `persistent_notification` id `school_menu_update` says which version is available, which
+  is installed, and links the release notes. Announced per version: the last announced version is
+  seeded from the restored state's `latest_version`, so a dismissed card does not return after a
+  restart. It is dismissed at the next check once the installed version is no longer older or the
+  version was skipped.
+- **Brand images.** `custom_components/school_menu/brand/{icon,dark_icon}.png` and `@2x` variants
+  (256 and 512 px, transparent, trimmed), concept "Mittag": a bowl under the noon sun, forest green
+  and amber, lighter tones for dark mode. HA ≥ 2026.3 serves them from the integration folder with no
+  brands-repo PR. No `logo.png`: HA falls back to the icon. Whether the HACS store tiles use local brand
+  images is unverified, so the README also opens with the icon (absolute raw GitHub URL, which HACS
+  renders). The `hacs/action` `brands` ignore stays until that check is known to accept local images.

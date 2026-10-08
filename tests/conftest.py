@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -12,6 +14,15 @@ pytest_plugins = ["pytest_homeassistant_custom_component"]
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):
     yield
+
+
+@pytest.fixture(autouse=True)
+def no_release_check():
+    with patch(
+        "custom_components.school_menu.update.async_fetch_latest_release",
+        AsyncMock(return_value=None),
+    ):
+        yield
 
 
 @pytest.fixture(autouse=True)

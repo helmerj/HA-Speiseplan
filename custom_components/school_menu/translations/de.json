@@ -45,6 +45,15 @@
     },
     "check_mail_skipped": {
       "message": "Das Postfach wurde gerade erst geprüft oder wird gerade geprüft. Versuch es in einer Minute noch einmal."
+    },
+    "update_unknown": {
+      "message": "Noch keine Version gefunden. Versuche es nach der nächsten Prüfung erneut oder installiere über HACS."
+    },
+    "install_needs_hacs": {
+      "message": "HACS ist nicht installiert oder kennt School Menu nicht. Installiere das Update über HACS."
+    },
+    "install_failed": {
+      "message": "HACS konnte Version {version} nicht installieren: {error}. Installiere sie über HACS → School Menu."
     }
   },
   "services": {
@@ -105,6 +114,11 @@
     "button": {
       "check_mail": {
         "name": "Speiseplan jetzt abrufen"
+      }
+    },
+    "update": {
+      "version": {
+        "name": "Version"
       }
     }
   }
