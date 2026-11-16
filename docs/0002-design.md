@@ -959,3 +959,10 @@ reverses "holidays are absence of data" (§4.3, §10 R15) for the two menu senso
   no-school (on Sunday evening: all five; on a Tuesday: Tuesday to Friday).
 - **Options form.** Both fields sit in the existing mailbox form for now; a separate
   "calendar & website" options step is a planned follow-up.
+
+**Amendment 2026-11-16 — install through the Marketplace (HAS-9).** Home Assistant 2026.11 ships HACS as
+the **Marketplace**: its update entity for this repository has platform `marketplace` with the same
+unique id (the GitHub repository id). `async_install` looks the entity up under `marketplace` first,
+then `hacs` (older installs); neither → the translated "install via the Marketplace (HACS)" error.
+Errors from the store, such as the Marketplace's one-time "accept the warning first", pass through
+`install_failed` with their text. Plan: `docs/plans/bug-HAS-9-marketplace-install.md`.

@@ -289,6 +289,41 @@ async def test_install_hands_the_exact_tag_to_hacs(
     assert calls[0].data == {"entity_id": hacs.entity_id, "version": "v99.0.0"}
 
 
+async def test_install_hands_the_exact_tag_to_the_marketplace(
+    hass: HomeAssistant, config_entry: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    aioclient_mock.get(GITHUB_LATEST_RELEASE_URL, json=_release())
+    await _setup(hass, config_entry)
+    store = er.async_get(hass).async_get_or_create(
+        "update", "marketplace", str(GITHUB_REPOSITORY_ID), suggested_object_id="school_menu_update"
+    )
+    calls = async_mock_service(hass, "update", "install")
+
+    await _entity(hass).async_install(None, False)
+
+    assert len(calls) == 1
+    assert calls[0].data == {"entity_id": store.entity_id, "version": "v99.0.0"}
+
+
+async def test_the_marketplace_wins_over_a_leftover_hacs_entity(
+    hass: HomeAssistant, config_entry: MockConfigEntry, aioclient_mock: AiohttpClientMocker
+) -> None:
+    aioclient_mock.get(GITHUB_LATEST_RELEASE_URL, json=_release())
+    await _setup(hass, config_entry)
+    registry = er.async_get(hass)
+    registry.async_get_or_create(
+        "update", "hacs", str(GITHUB_REPOSITORY_ID), suggested_object_id="old_hacs"
+    )
+    store = registry.async_get_or_create(
+        "update", "marketplace", str(GITHUB_REPOSITORY_ID), suggested_object_id="new_store"
+    )
+    calls = async_mock_service(hass, "update", "install")
+
+    await _entity(hass).async_install(None, False)
+
+    assert calls[0].data["entity_id"] == store.entity_id
+
+
 async def test_install_without_hacs_says_to_use_hacs(
     hass: HomeAssistant, config_entry: MockConfigEntry, aioclient_mock: AiohttpClientMocker
 ) -> None:

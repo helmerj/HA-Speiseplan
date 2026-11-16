@@ -32,8 +32,8 @@ from .const import (
     GITHUB_LATEST_RELEASE_URL,
     GITHUB_REPOSITORY_ID,
     GITHUB_TIMEOUT_SECONDS,
-    HACS_DOMAIN,
     NOTIFICATION_UPDATE_ID,
+    STORE_PLATFORMS,
     UPDATE_CHECK_HOURS,
     UPDATE_TITLE,
     UPDATE_VERSION,
@@ -140,7 +140,8 @@ class SchoolMenuUpdate(UpdateEntity):
         self._announced = self.latest_version
         message = (
             f"Version {self.latest_version} ist verfügbar, installiert ist "
-            f"{self.installed_version}. Installieren unter Einstellungen → Updates oder über HACS."
+            f"{self.installed_version}. Installieren unter Einstellungen → Updates oder "
+            "über den Marketplace (HACS)."
         )
         if self.release_url:
             message += f" [Versionshinweise]({self.release_url})"
@@ -154,8 +155,18 @@ class SchoolMenuUpdate(UpdateEntity):
     async def async_install(self, version: str | None, backup: bool, **kwargs: Any) -> None:
         if self._release is None:
             raise HomeAssistantError(translation_domain=DOMAIN, translation_key="update_unknown")
-        target = er.async_get(self.hass).async_get_entity_id(
-            UPDATE_DOMAIN, HACS_DOMAIN, str(GITHUB_REPOSITORY_ID)
+        registry = er.async_get(self.hass)
+        target = next(
+            (
+                entity_id
+                for platform in STORE_PLATFORMS
+                if (
+                    entity_id := registry.async_get_entity_id(
+                        UPDATE_DOMAIN, platform, str(GITHUB_REPOSITORY_ID)
+                    )
+                )
+            ),
+            None,
         )
         if target is None:
             raise HomeAssistantError(

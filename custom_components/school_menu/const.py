@@ -110,5 +110,5 @@ GITHUB_HEADERS = {
     "Accept": "application/vnd.github+json",
     "User-Agent": "school-menu-home-assistant",
 }
-HACS_DOMAIN = "hacs"
+STORE_PLATFORMS = ("marketplace", "hacs")
 NOTIFICATION_UPDATE_ID = "school_menu_update"
