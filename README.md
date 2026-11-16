@@ -13,7 +13,7 @@ Assistant sensors, so today's lunch and the next school day's are on the dashboa
 | `sensor.school_menu_next_school_day` | The next school day's main course — Fri, Sat and Sun all resolve to Monday; the `weekday` and `date` attributes say which day it is |
 | `sensor.school_menu_last_import` | Timestamp of the most recent accepted import (diagnostic) |
 | `button.school_menu_check_mail` | Checks the mailbox right away ("Check mail now" / "Speiseplan jetzt abrufen") |
-| `update.school_menu_version` | `on` when a newer School Menu release is out; installs it through HACS |
+| `update.school_menu_version` | `on` when a newer School Menu release is out; installs it through the Marketplace (HACS) |
 
 Each menu sensor also exposes `main`, `side`, `dessert` (positional, not semantic), the full `lines`
 list, `weekday`, `date`, `source_file` and `ingested_at`.
@@ -214,15 +214,17 @@ HACS checks a custom repository for new releases only when Home Assistant starts
 School Menu therefore checks GitHub itself, every 6 hours:
 
 - **`update.school_menu_version`** turns `on` when a newer release is out. It appears under
-  **Settings → Updates**; *Install* hands the exact release over to HACS, then restart as HACS asks.
+  **Settings → Updates**; *Install* hands the exact release over to the Marketplace (called HACS before Home Assistant
+  2026.11), then restart as it asks. The Marketplace installs nothing until its one-time warning has
+  been accepted in its own page.
 - **One notification per new version** ("School Menu"), with a link to the release notes. Once
   dismissed it does not come back for that version; it disappears by itself after the update.
 - Pre-releases and drafts are ignored. If GitHub is unreachable or rate-limited, nothing is reported
   and the last known release is kept.
 - To switch the check off, disable the entity (Settings → Entities → School Menu Version → Disable).
 
-Once HACS's own 48-hour check catches up, Settings may list the same release twice, once from School
-Menu and once from HACS; either one installs it.
+Once the Marketplace's own 48-hour check catches up, Settings may list the same release twice, once
+from School Menu and once from the Marketplace; either one installs it.
 
 To get a push message on your phone (Home Assistant Companion app), add this automation and replace
 `notify.mobile_app_your_phone` with your own notify action:

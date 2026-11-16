@@ -47,13 +47,13 @@
       "message": "Das Postfach wurde gerade erst geprüft oder wird gerade geprüft. Versuch es in einer Minute noch einmal."
     },
     "update_unknown": {
-      "message": "Noch keine Version gefunden. Versuche es nach der nächsten Prüfung erneut oder installiere über HACS."
+      "message": "Noch keine Version gefunden. Versuche es nach der nächsten Prüfung erneut oder installiere über den Marketplace (HACS)."
     },
     "install_needs_hacs": {
-      "message": "HACS ist nicht installiert oder kennt School Menu nicht. Installiere das Update über HACS."
+      "message": "Weder der Marketplace noch HACS kennt School Menu. Füge das Repository dort hinzu und installiere das Update darüber."
     },
     "install_failed": {
-      "message": "HACS konnte Version {version} nicht installieren: {error}. Installiere sie über HACS → School Menu."
+      "message": "Der Marketplace (HACS) konnte Version {version} nicht installieren: {error}. Installiere sie über Marketplace → School Menu."
     }
   },
   "services": {
