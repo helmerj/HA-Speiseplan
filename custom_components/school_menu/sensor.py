@@ -15,6 +15,7 @@ from homeassistant.util import dt as dt_util
 from .const import (
     ATTR_DATE,
     ATTR_DESSERT,
+    ATTR_HOLIDAY,
     ATTR_INGESTED_AT,
     ATTR_LINES,
     ATTR_MAIN,
@@ -28,6 +29,7 @@ from .const import (
     DOMAIN,
     GERMAN_WEEKDAYS,
     NO_MENU_STATE,
+    REASON_HOLIDAY,
     REASON_NO_MENU,
     REASON_WEEKEND,
     SENSOR_LAST_IMPORT,
@@ -118,7 +120,12 @@ class SchoolMenuSensor(CoordinatorEntity[SchoolMenuCoordinator], SensorEntity):
         }
         menu = self.coordinator.menu_for(day)
         if menu is None or not menu.lines:
-            attributes[ATTR_REASON] = REASON_NO_MENU
+            holiday = self._holiday(day)
+            if holiday is None:
+                attributes[ATTR_REASON] = REASON_NO_MENU
+            else:
+                attributes[ATTR_REASON] = REASON_HOLIDAY
+                attributes[ATTR_HOLIDAY] = holiday
             return attributes
 
         attributes[ATTR_MAIN] = menu.main
@@ -130,6 +137,15 @@ class SchoolMenuSensor(CoordinatorEntity[SchoolMenuCoordinator], SensorEntity):
             attributes[ATTR_SOURCE_FILE] = record.get("source_file")
             attributes[ATTR_INGESTED_AT] = record.get("ingested_at")
         return attributes
+
+    def _holiday(self, day: datetime.date) -> str | None:
+        no_school = self.coordinator.no_school
+        if day in no_school:
+            return no_school[day]
+        today = dt_util.now().date()
+        if self._which == SENSOR_NEXT_SCHOOL_DAY and (day - today).days > 1:
+            return no_school.get(today)
+        return None
 
 
 class LastImportSensor(CoordinatorEntity[SchoolMenuCoordinator], SensorEntity):

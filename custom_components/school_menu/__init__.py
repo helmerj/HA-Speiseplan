@@ -9,10 +9,10 @@ import voluptuous as vol
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import EVENT_CORE_CONFIG_UPDATE, Platform
-from homeassistant.core import Event, HomeAssistant, ServiceCall, callback
+from homeassistant.core import Event, EventStateChangedData, HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.event import async_track_time_change
+from homeassistant.helpers.event import async_track_state_change_event, async_track_time_change
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
@@ -33,7 +33,7 @@ from .const import (
     SOURCE_MANUAL,
     WEB_CHECK_EVERY_HOURS,
 )
-from .coordinator import SchoolMenuCoordinator
+from .coordinator import SchoolMenuCoordinator, calendars
 from .imap_client import create_client
 from .models import MenuParseError, ParsedWeek
 from .parser import extract_lines, parse_lines
@@ -200,16 +200,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_create_background_task(
-        hass, coordinator.async_check_website(), f"{DOMAIN}_first_website_check"
+        hass, _async_first_checks(coordinator), f"{DOMAIN}_first_checks"
     )
+    entry.async_on_unload(coordinator.async_cancel_holiday_retry)
 
     @callback
     def _at_midnight(now: datetime.datetime) -> None:
         coordinator.async_update_listeners()
+        entry.async_create_background_task(
+            hass, coordinator.async_refresh_no_school(), f"{DOMAIN}_holidays"
+        )
+
+    @callback
+    def _on_calendar_change(event: Event[EventStateChangedData]) -> None:
+        old, new = event.data["old_state"], event.data["new_state"]
+        if old is not None and new is not None and old.state == new.state:
+            return
+        entry.async_create_background_task(
+            hass, coordinator.async_refresh_no_school(), f"{DOMAIN}_holidays"
+        )
 
     @callback
     def _on_core_config(event: Event) -> None:
         coordinator.async_update_listeners()
+        entry.async_create_background_task(
+            hass, coordinator.async_refresh_no_school(), f"{DOMAIN}_holidays"
+        )
 
     entry.async_on_unload(async_track_time_change(hass, _at_midnight, hour=0, minute=0, second=0))
 
@@ -217,6 +233,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.async_check_website()
 
     entry.async_on_unload(hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, _on_core_config))
+    watched = [entity_id for entity_id in calendars(entry) if entity_id]
+    if watched:
+        entry.async_on_unload(async_track_state_change_event(hass, watched, _on_calendar_change))
     entry.async_on_unload(
         async_track_time_change(
             hass,
@@ -227,6 +246,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     )
     return True
+
+
+async def _async_first_checks(coordinator: SchoolMenuCoordinator) -> None:
+    try:
+        await coordinator.async_refresh_no_school()
+    except Exception:
+        _LOGGER.exception("Could not read the holiday calendars")
+    await coordinator.async_check_website()
 
 
 def _is_legacy_sender_default(senders: object) -> bool:

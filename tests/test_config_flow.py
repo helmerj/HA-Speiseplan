@@ -284,3 +284,72 @@ async def test_the_options_flow_refuses_an_unusable_website(
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"web_url": "invalid_web_url"}
     assert entry.data == {}
+
+
+async def test_the_calendars_are_optional_and_empty_by_default(hass: HomeAssistant) -> None:
+    from unittest.mock import patch
+
+    entry, result = await _open_options(hass)
+    names = {str(key) for key in result["data_schema"].schema}
+    assert {"holiday_calendar", "workday_calendar"} <= names
+
+    with patch("custom_components.school_menu._imap_client_factory"):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], dict(MAILBOX_INPUT)
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.data["holiday_calendar"] == ""
+    assert entry.data["workday_calendar"] == ""
+
+
+async def test_the_options_flow_stores_the_calendars(hass: HomeAssistant) -> None:
+    from unittest.mock import patch
+
+    entry, result = await _open_options(hass)
+    with patch("custom_components.school_menu._imap_client_factory"):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                **MAILBOX_INPUT,
+                "holiday_calendar": "calendar.schulferien_berlin",
+                "workday_calendar": "calendar.workday_sensor_kalender",
+            },
+        )
+        await hass.async_block_till_done()
+
+    assert entry.data["holiday_calendar"] == "calendar.schulferien_berlin"
+    assert entry.data["workday_calendar"] == "calendar.workday_sensor_kalender"
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    suggested = {
+        str(key): (key.description or {}).get("suggested_value")
+        for key in result["data_schema"].schema
+    }
+    assert suggested["holiday_calendar"] == "calendar.schulferien_berlin"
+
+
+async def test_a_cleared_calendar_stays_cleared_when_the_form_is_shown_again(
+    hass: HomeAssistant,
+) -> None:
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=SINGLE_ENTRY_UNIQUE_ID,
+        data={"holiday_calendar": "calendar.schulferien_berlin"},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**MAILBOX_INPUT, "web_url": "http://insecure.example/plan.pdf"}
+    )
+
+    assert result["errors"] == {"web_url": "invalid_web_url"}
+    suggested = {
+        str(key): (key.description or {}).get("suggested_value")
+        for key in result["data_schema"].schema
+    }
+    assert not suggested["holiday_calendar"]

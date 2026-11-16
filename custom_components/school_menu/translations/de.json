@@ -94,13 +94,17 @@
           "senders": "Absender",
           "subject_filter": "Betreff enthält",
           "scan_interval_minutes": "Abrufintervall (Minuten)",
-          "web_url": "PDF auf der Schulwebsite"
+          "web_url": "PDF auf der Schulwebsite",
+          "holiday_calendar": "Ferienkalender",
+          "workday_calendar": "Arbeitstage-Kalender"
         },
         "data_description": {
           "senders": "Wer den Speiseplan schicken darf. Eine vollständige Adresse oder @domain für alle Absender dieser Domain (Standard: @annie-heuser.schule).",
           "subject_filter": "Eine Mail zählt nur, wenn ihr Betreff diesen Text enthält (Groß-/Kleinschreibung egal) und sie einen PDF-Anhang hat.",
           "scan_interval_minutes": "Wie oft das Postfach geprüft wird, 5–1440 Minuten. Für eine sofortige Prüfung gibt es die Taste „Speiseplan jetzt abrufen“.",
-          "web_url": "Öffentlicher Speiseplan, wird ab Sonntag 18 Uhr alle 2 Stunden geprüft, bis der Plan der Woche gespeichert ist. Leer lassen schaltet die Prüfung ab."
+          "web_url": "Öffentlicher Speiseplan, wird ab Sonntag 18 Uhr alle 2 Stunden geprüft, bis der Plan der Woche gespeichert ist. Leer lassen schaltet die Prüfung ab.",
+          "holiday_calendar": "Jeder Termin in diesem Kalender bedeutet: an diesem Tag keine Schule (z. B. ein Ferien-Abo). Die Karte zeigt dann „Keine Menüinformationen - Ferien“ statt „Noch keine Menüinformationen vorhanden“.",
+          "workday_calendar": "Optional: der Kalender der Workday-Integration. Ein Wochentag ohne Termin gilt als Feiertag."
         }
       }
     },

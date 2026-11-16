@@ -8,6 +8,9 @@
   "dependencies": [
     "file_upload"
   ],
+  "after_dependencies": [
+    "calendar"
+  ],
   "documentation": "https://github.com/helmerj/HA-Speiseplan",
   "integration_type": "service",
   "iot_class": "cloud_polling",
@@ -20,5 +23,5 @@
     "aioimaplib>=2.0.1"
   ],
   "single_config_entry": true,
-  "version": "0.5.0"
+  "version": "0.6.0"
 }

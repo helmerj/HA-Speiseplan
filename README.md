@@ -9,7 +9,7 @@ Assistant sensors, so today's lunch and the next school day's are on the dashboa
 
 | Entity | What it reports |
 |---|---|
-| `sensor.school_menu_today` | Today's main course; `none` with `reason: weekend \| no_menu` when there is no lunch |
+| `sensor.school_menu_today` | Today's main course; `none` with `reason: weekend \| holiday \| no_menu` when there is no lunch (`holiday` adds the attribute `holiday`, e.g. `Weihnachtsferien Berlin`) |
 | `sensor.school_menu_next_school_day` | The next school day's main course — Fri, Sat and Sun all resolve to Monday; the `weekday` and `date` attributes say which day it is |
 | `sensor.school_menu_last_import` | Timestamp of the most recent accepted import (diagnostic) |
 | `button.school_menu_check_mail` | Checks the mailbox right away ("Check mail now" / "Speiseplan jetzt abrufen") |
@@ -123,6 +123,10 @@ cards:
       {%- elif lines -%}
       {{ lines[0] }}
       {{ lines[1:] | join(' · ') }}
+      {%- elif state_attr(e, 'reason') == 'holiday' -%}
+      Keine Menüinformationen - Ferien
+      {%- elif state_attr(e, 'reason') == 'no_menu' -%}
+      Noch keine Menüinformationen vorhanden
       {%- else -%}
       Kein Mittagessen
       {%- endif -%}
@@ -150,7 +154,8 @@ cards:
       {%- if states(e) in ['unavailable', 'unknown'] -%}
       Speiseplan nicht verfügbar
       {%- else -%}
-      {{ lines[0] if lines else 'Kein Mittagessen' }}
+      {%- set empty = {'holiday': 'Keine Menüinformationen - Ferien', 'no_menu': 'Noch keine Menüinformationen vorhanden'} -%}
+      {{ lines[0] if lines else empty.get(state_attr(e, 'reason'), 'Kein Mittagessen') }}
       {%- if lines[1:] %}
       {{ lines[1:] | join(' · ') }}
       {%- endif %}
@@ -174,9 +179,34 @@ Each tile's icon follows its main course: pasta, soup, chili, rice, fish, vegeta
 on (a keyword table in `custom_components/school_menu/icons.py`); anything unrecognised shows a
 neutral plate.
 
-On weekends, holidays and days without a menu the text reads **Kein Mittagessen**. If the
-integration itself is not running, it reads **Speiseplan nicht verfügbar** instead, so a broken
-setup is never mistaken for a day without lunch.
+When there is no menu, the text says why:
+
+| Situation | Text |
+|---|---|
+| Ferien day or public holiday (needs the calendars below) | **Keine Menüinformationen - Ferien** |
+| School day, menu not received yet | **Noch keine Menüinformationen vorhanden** |
+| Today is Saturday or Sunday | **Kein Mittagessen** |
+| The integration is not running | **Speiseplan nicht verfügbar** |
+
+On the last days of the Ferien the next-school-day tile keeps the Ferien text until the first day
+after the Ferien (usually the Sunday), even though the next Monday is a school day.
+
+### Holidays
+
+School Menu cannot know the Ferien on its own. Give it up to two Home Assistant calendars under
+**Settings → Devices & services → School Menu → Configure**:
+
+- **School holiday calendar** — any event means no school that day. For Berlin, add the Ferien
+  subscription with the built-in **Remote Calendar** integration (Settings → Devices & services →
+  Add integration → Remote Calendar), using the `https://` form of the `webcal://` link.
+- **Working day calendar** (optional) — the calendar of the
+  [Workday](https://www.home-assistant.io/integrations/workday/) integration. A weekday without an
+  event there counts as a public holiday (*Feiertag*), which the Ferien calendar does not contain.
+
+Without calendars every day without a menu reads "Noch keine Menüinformationen vorhanden". If a
+calendar cannot be read, School Menu falls back to that as well, so a broken calendar never claims
+there is no school. A menu that has arrived is always shown, even on a calendar holiday. Weeks that
+are holidays from Monday to Friday are not checked on the school website.
 
 ## Updates
 
