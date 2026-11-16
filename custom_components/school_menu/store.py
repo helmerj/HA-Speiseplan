@@ -60,6 +60,12 @@ class MenuStore:
             content_hash in record.get("content_hashes", []) for record in self.weeks.values()
         )
 
+    def week_key_for_hash(self, content_hash: str) -> str | None:
+        for key, record in self.weeks.items():
+            if content_hash in record.get("content_hashes", []):
+                return key
+        return None
+
     def stored_week(self, week: ParsedWeek) -> dict[str, Any] | None:
         return self.weeks.get(iso_week_key(week.week_start))
 

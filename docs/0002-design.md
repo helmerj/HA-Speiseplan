@@ -552,6 +552,7 @@ therefore also listens for `EVENT_CORE_CONFIG_UPDATE` and refreshes the listener
 | Parse failure (any `MenuParseError`) | **Stored data untouched.** `persistent_notification.async_create` with the reason key and the filename — **not** the extracted text (amended 2026-09-25, see below). Notification id `school_menu_import_error` so repeats replace rather than pile up. Service raises `HomeAssistantError` so the caller/automation sees it fail. |
 | Path outside allowlist, bad args, entry not loaded | `ServiceValidationError` — shown inline in the UI, no notification, not an integration fault. |
 | **Manual** import success | `persistent_notification` (id `school_menu_import_ok`, replaced on next success) naming the week and day count. |
+| **Manual mail check** (button / `check_mail`) | `persistent_notification` id `school_menu_import_ok` with the outcome: imported weeks, weeks already stored, or no matching mail (amendment 2026-11-05, HAS-6). |
 | **IMAP** import success | **No notification** (§10 R8). `INFO` log; `sensor.school_menu_last_import` updates. A weekly notification you must dismiss would train you to ignore the failure notifications. |
 | Day absent / weekend | **Not an error.** State `none` + `reason`. Never raises, never logs above debug. |
 | Day with >3 lines, or a day anchor with 0 lines | **Not an error.** `WARNING` log naming the day; import proceeds (§10 R6, R9). |
@@ -679,7 +680,7 @@ All 15 branches closed. These are binding; §§1–9 above already reflect them.
 | R5 | IMAP selection | `SINCE today-14d` + `FROM <sender>`, `BODY.PEEK[]`, `\Seen` never set | §5.5 |
 | R6 | Day with 4–5 lines | Keep all in `lines`, `WARNING` log, no wrap-merge heuristic | §5.1 step 5 |
 | R7 | HA version floor | `2026.9.3`; CI matrix {2026.9.3, latest stable} | §0, §9 |
-| R8 | Success notification | Manual imports only; IMAP success is an `INFO` log | §7 |
+| R8 | Success notification | Manual imports only; IMAP success is an `INFO` log. **Amended 2026-11-05 (HAS-6):** a forced mail check reports its outcome, scheduled polls stay silent | §7 |
 | R9 | Day anchor with 0 lines | Omit, `WARNING` log, `reason: no_menu`; no empty-day record | §5.1 step 6 |
 | R10 | Card empty state | German `Kein Mittagessen` | §9 M3 |
 | R11 | Repo | `helmerj/HA-Speiseplan`; hassfest + HACS + pytest workflows, `git init` + initial commit; **no** issue/PR templates | §3, §9 M1 |
@@ -845,3 +846,31 @@ HAS-3 fix. The hash short-circuit now applies to the **IMAP path only**, where i
 second teacher's copy. A manual import always compares the parsed lines with the stored week: identical
 lines still report "unverändert" and record nothing new; different lines overwrite the week and fan out.
 The hash is not recorded twice. Ships in 0.3.0.
+
+**Amendment 2026-11-05 — a manual mail check reports what it found (HAS-6).** A press of
+`button.school_menu_check_mail` (or `school_menu.check_mail`) that found only already stored menus
+gave no feedback at all: the forced poll ran, layers 1–2 of §5.5 absorbed the mail, and nothing
+changed. Seen on 2026-11-05: KW 46 had been imported by the 16:15 poll, the 16:41 press looked like a
+miss. Plan: `docs/plans/check-mail-feedback.md`.
+
+- **Outcome notification, forced checks only.** After a *successful* forced check,
+  `persistent_notification` id `school_menu_import_ok` (the manual-import id, so the latest manual
+  action replaces the previous card) states the outcome in German, in this precedence:
+  1. Something imported: `Neuer Speiseplan importiert: KW 46 (5 Tage).` — one entry per imported
+     week, ISO weeks ascending.
+  2. Matching mails found, all already stored: `Kein neuer Speiseplan. Bereits importiert: KW 46.` —
+     the distinct ISO weeks of the attachments found, from the stored record that holds the
+     attachment's content hash, or from the parsed week when the content was re-parsed unchanged.
+  3. No matching mail with a PDF in the search window:
+     `Keine Speiseplan-Mail in den letzten 14 Tagen gefunden.`
+  When attachments were refused (parse error, shrink guard), the text gets
+  ` N Anhang/Anhänge nicht übernommen, siehe separate Meldung.` appended; the per-attachment
+  `school_menu_import_error` notification is unchanged.
+- **Scheduled polls unchanged.** §10 R8 holds for the timer: no success notification, INFO log and
+  `last_import` only. A forced check is an operator action, the same class as a manual `import_pdf`,
+  which already reports success (§7).
+- **Failures unchanged.** A skipped or failed forced check still raises `check_mail_skipped` /
+  `check_mail_failed` and posts no outcome notification.
+- **Mechanism.** The coordinator collects an outcome record only while a forced check runs; the
+  ingest path records `imported` / `already_stored` / `refused` per attachment. `MenuStore` gains a
+  lookup from content hash to the ISO week key that recorded it.

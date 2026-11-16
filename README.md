@@ -57,6 +57,10 @@ reached, the button and the action report the error instead of pretending succes
 within a minute of a successful one, or while a check is running, is skipped with a short
 message saying so. An attachment that is still unreadable is
 reported again on every manual check.
+Every successful manual check ends with a notification saying what it found: the week it imported
+("Neuer Speiseplan importiert: KW 46 (5 Tage)."), the weeks that were already stored ("Kein neuer
+Speiseplan. Bereits importiert: KW 46."), or that no menu mail was found. The scheduled checks stay
+silent.
 
 Installations from v0.1.0 that still have the old defaults (the two class teachers, `Speiseplan KW`)
 are switched to the new defaults automatically on update; customised values are kept. A mail

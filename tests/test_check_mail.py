@@ -12,6 +12,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.school_menu.const import (
     DOMAIN,
     NOTIFICATION_ERROR_ID,
+    NOTIFICATION_OK_ID,
     SERVICE_CHECK_MAIL,
 )
 from tests.fake_imap import (
@@ -303,3 +304,124 @@ async def test_a_check_that_has_not_reached_the_mailbox_yet_still_blocks_a_secon
         await first
 
     assert raised.value.translation_key == "check_mail_skipped"
+
+
+def _outcome(hass: HomeAssistant) -> str | None:
+    notification = _notifications(hass).get(NOTIFICATION_OK_ID)
+    return notification["message"] if notification else None
+
+
+@pytest.mark.m6
+async def test_a_check_that_imports_a_week_names_it(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer([])
+    coordinator = await setup_mailbox(hass, mail_entry, server)
+    server.messages = [mail("1", TEACHER_A, "Speiseplan KW40", pdf())]
+
+    await _press(hass)
+
+    days = len(coordinator.store.weeks["2026-W40"]["days"])
+    assert _outcome(hass) == f"Neuer Speiseplan importiert: KW 40 ({days} Tage)."
+
+
+@pytest.mark.m6
+async def test_a_check_that_finds_only_stored_menus_says_so_once_per_week(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer(
+        [
+            mail("1", TEACHER_A, "Speiseplan KW40", pdf()),
+            mail("2", TEACHER_B, "Speiseplan KW40", pdf()),
+        ]
+    )
+    await setup_mailbox(hass, mail_entry, server)
+    assert _outcome(hass) is None
+
+    await _check(hass)
+
+    assert _outcome(hass) == "Kein neuer Speiseplan. Bereits importiert: KW 40."
+
+
+@pytest.mark.m6
+async def test_a_reparsed_unchanged_week_counts_as_already_stored(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer([mail("1", TEACHER_A, "Speiseplan KW40", pdf())])
+    coordinator = await setup_mailbox(hass, mail_entry, server)
+    coordinator.store.weeks["2026-W40"]["content_hashes"] = []
+
+    await _check(hass)
+
+    assert _outcome(hass) == "Kein neuer Speiseplan. Bereits importiert: KW 40."
+
+
+@pytest.mark.m6
+async def test_a_check_that_finds_no_mail_says_so(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    await setup_mailbox(hass, mail_entry, FakeImapServer([]))
+
+    await _press(hass)
+
+    assert _outcome(hass) == "Keine Speiseplan-Mail in den letzten 14 Tagen gefunden."
+
+
+@pytest.mark.m6
+async def test_a_check_counts_refused_attachments_and_still_reports_them(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer([mail("1", TEACHER_A, "Speiseplan KW40", pdf())])
+    await setup_mailbox(hass, mail_entry, server)
+    server.messages.append(mail("2", TEACHER_B, "Speiseplan KW40", b"broken", "kaputt.pdf"))
+
+    await _check(hass)
+
+    assert _outcome(hass) == (
+        "Kein neuer Speiseplan. Bereits importiert: KW 40. "
+        "1 Anhang/Anhänge nicht übernommen, siehe separate Meldung."
+    )
+    assert "kaputt.pdf" in _notifications(hass)[NOTIFICATION_ERROR_ID]["message"]
+
+
+@pytest.mark.m6
+async def test_a_scheduled_poll_stays_silent(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer([])
+    coordinator = await setup_mailbox(hass, mail_entry, server)
+    server.messages = [mail("1", TEACHER_A, "Speiseplan KW40", pdf())]
+
+    await coordinator.async_refresh()
+
+    assert "2026-W40" in coordinator.store.weeks
+    assert _outcome(hass) is None
+
+
+@pytest.mark.m6
+async def test_a_failed_or_skipped_check_posts_no_outcome(
+    hass: HomeAssistant, mail_entry: MockConfigEntry, freezer
+) -> None:
+    from homeassistant.exceptions import HomeAssistantError
+
+    freezer.move_to("2026-09-30 09:00:00+02:00")
+    server = FakeImapServer([mail("1", TEACHER_A, "Speiseplan KW40", pdf())])
+    await setup_mailbox(hass, mail_entry, server)
+    server.select_result = "NO"
+    with pytest.raises(HomeAssistantError):
+        await _check(hass)
+    assert _outcome(hass) is None
+
+    server.select_result = "OK"
+    await _check(hass)
+    persistent_notification.async_dismiss(hass, NOTIFICATION_OK_ID)
+    with pytest.raises(HomeAssistantError) as raised:
+        await _check(hass)
+    assert raised.value.translation_key == "check_mail_skipped"
+    assert _outcome(hass) is None

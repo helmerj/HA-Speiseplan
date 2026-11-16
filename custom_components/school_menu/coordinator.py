@@ -4,6 +4,7 @@ import asyncio
 import datetime
 import hashlib
 import logging
+from dataclasses import dataclass, field
 
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
@@ -34,6 +35,7 @@ from .const import (
     MIN_SCAN_INTERVAL_MINUTES,
     NOTIFICATION_ERROR_ID,
     NOTIFICATION_IMAP_ID,
+    NOTIFICATION_OK_ID,
     REASON_FEWER_DAYS,
     SOURCE_IMAP,
 )
@@ -77,6 +79,33 @@ def _parse_attachment(attachment: MailAttachment, content_hash: str) -> ParsedWe
     )
 
 
+@dataclass(slots=True)
+class CheckReport:
+    imported: dict[str, int] = field(default_factory=dict)
+    already_stored: set[str] = field(default_factory=set)
+    refused: int = 0
+
+
+def _week_label(key: str) -> str:
+    return f"KW {int(key.rpartition('W')[2])}"
+
+
+def check_outcome_message(report: CheckReport) -> str:
+    if report.imported:
+        weeks = ", ".join(
+            f"{_week_label(key)} ({days} Tage)" for key, days in sorted(report.imported.items())
+        )
+        message = f"Neuer Speiseplan importiert: {weeks}."
+    elif report.already_stored:
+        weeks = ", ".join(_week_label(key) for key in sorted(report.already_stored))
+        message = f"Kein neuer Speiseplan. Bereits importiert: {weeks}."
+    else:
+        message = "Keine Speiseplan-Mail in den letzten 14 Tagen gefunden."
+    if report.refused:
+        message += f" {report.refused} Anhang/Anhänge nicht übernommen, siehe separate Meldung."
+    return message
+
+
 class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         settings = imap_settings(entry)
@@ -100,6 +129,7 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
         self.poll_lock = asyncio.Lock()
         self._last_forced_check: datetime.datetime | None = None
         self._check_running = False
+        self._report: CheckReport | None = None
 
     async def async_initialise(self) -> None:
         await self.store.async_load()
@@ -154,12 +184,14 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
                 translation_domain=DOMAIN, translation_key="check_mail_skipped"
             )
         self._check_running = True
+        report = self._report = CheckReport()
         try:
             self.seen_messages.clear()
             self.rejected_hashes.clear()
             await self.async_refresh()
         finally:
             self._check_running = False
+            self._report = None
         if not self.last_update_success:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
@@ -167,9 +199,17 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
                 translation_placeholders={"reason": str(self.last_exception or "unknown")},
             )
         self._last_forced_check = now
+        persistent_notification.async_create(
+            self.hass,
+            check_outcome_message(report),
+            title="School menu",
+            notification_id=NOTIFICATION_OK_ID,
+        )
 
     def _reject(self, filename: str, content_hash: str, reason: str) -> None:
         self.rejected_hashes.add(content_hash)
+        if self._report is not None:
+            self._report.refused += 1
         _LOGGER.warning("Not importing %s from the mailbox: %s", filename, reason)
         persistent_notification.async_create(
             self.hass,
@@ -183,6 +223,7 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
         content_hash = hashlib.sha256(attachment.payload).hexdigest()
         if self.store.knows_hash(content_hash) or content_hash in self.rejected_hashes:
             _LOGGER.debug("Skipping %s, content hash already seen", attachment.filename)
+            self._record_stored(self.store.week_key_for_hash(content_hash))
             return
         try:
             week = await self.hass.async_add_executor_job(
@@ -204,6 +245,7 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
     async def async_import_week(self, week: ParsedWeek, *, source: str) -> bool:
         if source == SOURCE_IMAP and self.store.knows_hash(week.content_hash):
             _LOGGER.debug("Skipping %s, content hash already stored", week.source_file)
+            self._record_stored(iso_week_key(week.week_start))
             return False
 
         existing = self.store.stored_week(week)
@@ -232,6 +274,7 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
             return False
         if unchanged:
             _LOGGER.debug("Week %s unchanged, recording hash only", iso_week_key(week.week_start))
+            self._record_stored(iso_week_key(week.week_start))
             return False
 
         _LOGGER.info(
@@ -240,8 +283,14 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
             len(week.days),
             week.source_file,
         )
+        if self._report is not None:
+            self._report.imported[iso_week_key(week.week_start)] = len(week.days)
         self.async_set_updated_data(None)
         return True
+
+    def _record_stored(self, key: str | None) -> None:
+        if self._report is not None and key is not None:
+            self._report.already_stored.add(key)
 
     def menu_for(self, day: datetime.date) -> DayMenu | None:
         return self.store.index.get(day)
