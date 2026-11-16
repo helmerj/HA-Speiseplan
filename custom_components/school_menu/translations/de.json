@@ -93,12 +93,14 @@
           "folder": "Ordner",
           "senders": "Absender",
           "subject_filter": "Betreff enthält",
-          "scan_interval_minutes": "Abrufintervall (Minuten)"
+          "scan_interval_minutes": "Abrufintervall (Minuten)",
+          "web_url": "PDF auf der Schulwebsite"
         },
         "data_description": {
           "senders": "Wer den Speiseplan schicken darf. Eine vollständige Adresse oder @domain für alle Absender dieser Domain (Standard: @annie-heuser.schule).",
           "subject_filter": "Eine Mail zählt nur, wenn ihr Betreff diesen Text enthält (Groß-/Kleinschreibung egal) und sie einen PDF-Anhang hat.",
-          "scan_interval_minutes": "Wie oft das Postfach geprüft wird, 5–1440 Minuten. Für eine sofortige Prüfung gibt es die Taste „Speiseplan jetzt abrufen“."
+          "scan_interval_minutes": "Wie oft das Postfach geprüft wird, 5–1440 Minuten. Für eine sofortige Prüfung gibt es die Taste „Speiseplan jetzt abrufen“.",
+          "web_url": "Öffentlicher Speiseplan, wird ab Sonntag 18 Uhr alle 2 Stunden geprüft, bis der Plan der Woche gespeichert ist. Leer lassen schaltet die Prüfung ab."
         }
       }
     },
@@ -107,7 +109,8 @@
       "no_password": "Gib das Passwort des Postfachs ein.",
       "no_host": "Gib den Namen des IMAP-Servers ein.",
       "invalid_sender": "Jeder Absender muss eine einzelne E-Mail-Adresse oder @domain sein, z. B. @annie-heuser.schule.",
-      "no_subject_filter": "Gib einen Betreff-Filter an; ein leerer Filter würde jede Mail treffen."
+      "no_subject_filter": "Gib einen Betreff-Filter an; ein leerer Filter würde jede Mail treffen.",
+      "invalid_web_url": "Gib eine https://-Adresse an oder lass das Feld leer, um die Website-Prüfung abzuschalten."
     }
   },
   "entity": {

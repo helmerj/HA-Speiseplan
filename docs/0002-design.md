@@ -52,6 +52,7 @@ flowchart TB
         A1["Service call<br/>file_path under /config/www or /media"]
         A2["Service call<br/>uploaded file_id (FileSelector)"]
         A3["IMAP mailbox<br/>2 senders, same week twice (M2)"]
+        A4["School website PDF<br/>Sun 18:00 until the week is stored (HAS-7)"]
     end
 
     subgraph pure["Pure Python — no HA imports — unit-testable"]
@@ -64,6 +65,7 @@ flowchart TB
     subgraph ha["Home Assistant integration"]
         I["__init__.py<br/>setup, service handlers, midnight timer"]
         IM["imap_client.py (M2)<br/>SINCE+FROM search, PEEK fetch, sha256"]
+        WC["web_client.py (HAS-7)<br/>conditional GET, size cap"]
         CO["coordinator.py<br/>SchoolMenuCoordinator (DataUpdateCoordinator)"]
         ST["store.py<br/>MenuStore (Store v1, 4-week prune, hash ledger)"]
         SE["sensor.py<br/>today + next_school_day + last_import"]
@@ -77,6 +79,7 @@ flowchart TB
     A1 --> I
     A2 --> I
     A3 --> IM --> CO
+    A4 --> WC --> CO
     I --> E
     E --> P
     P --> C
@@ -552,6 +555,8 @@ therefore also listens for `EVENT_CORE_CONFIG_UPDATE` and refreshes the listener
 | Parse failure (any `MenuParseError`) | **Stored data untouched.** `persistent_notification.async_create` with the reason key and the filename — **not** the extracted text (amended 2026-09-25, see below). Notification id `school_menu_import_error` so repeats replace rather than pile up. Service raises `HomeAssistantError` so the caller/automation sees it fail. |
 | Path outside allowlist, bad args, entry not loaded | `ServiceValidationError` — shown inline in the UI, no notification, not an integration fault. |
 | **Manual** import success | `persistent_notification` (id `school_menu_import_ok`, replaced on next success) naming the week and day count. |
+| **Manual mail check** (button / `check_mail`) | `persistent_notification` id `school_menu_import_ok` with the outcome: imported weeks, weeks already stored, or no matching mail (amendment 2026-11-05, HAS-6). |
+| **Website** import success, fetch failure (HAS-7) | **No notification.** Success: `INFO` log and `last_import` (`source: web`). HTTP error, timeout, network error or oversize body: `WARNING` log only — the mailbox stays primary, and a renamed file is the same silent stop as a changed mail subject (§10 R15). An unparseable or shrinking website PDF takes the per-attachment IMAP row below. |
 | **IMAP** import success | **No notification** (§10 R8). `INFO` log; `sensor.school_menu_last_import` updates. A weekly notification you must dismiss would train you to ignore the failure notifications. |
 | Day absent / weekend | **Not an error.** State `none` + `reason`. Never raises, never logs above debug. |
 | Day with >3 lines, or a day anchor with 0 lines | **Not an error.** `WARNING` log naming the day; import proceeds (§10 R6, R9). |
@@ -679,14 +684,14 @@ All 15 branches closed. These are binding; §§1–9 above already reflect them.
 | R5 | IMAP selection | `SINCE today-14d` + `FROM <sender>`, `BODY.PEEK[]`, `\Seen` never set | §5.5 |
 | R6 | Day with 4–5 lines | Keep all in `lines`, `WARNING` log, no wrap-merge heuristic | §5.1 step 5 |
 | R7 | HA version floor | `2026.9.3`; CI matrix {2026.9.3, latest stable} | §0, §9 |
-| R8 | Success notification | Manual imports only; IMAP success is an `INFO` log | §7 |
+| R8 | Success notification | Manual imports only; IMAP success is an `INFO` log. **Amended 2026-11-05 (HAS-6):** a forced mail check reports its outcome, scheduled polls stay silent. **Amended 2026-11-16 (HAS-7):** the website source is unattended like IMAP — no success notification | §7 |
 | R9 | Day anchor with 0 lines | Omit, `WARNING` log, `reason: no_menu`; no empty-day record | §5.1 step 6 |
 | R10 | Card empty state | German `Kein Mittagessen` | §9 M3 |
 | R11 | Repo | `helmerj/HA-Speiseplan`; hassfest + HACS + pytest workflows, `git init` + initial commit; **no** issue/PR templates | §3, §9 M1 |
 | R12 | Parser seam | `extract_lines(bytes)` / `parse_lines(lines)`; synthetic cases are string lists, no fixture PDFs | §5.1, §8 |
 | R13 | Coordinator | `DataUpdateCoordinator` with `update_interval=None` in M1; `CoordinatorEntity` sensors | §6 |
 | R14 | Mail matching | Sender **and** subject both required; subject = case-insensitive substring on the RFC 2047-decoded header. **Amended 2026-10-02 (HAS-1):** sender may be a whole domain (`@annie-heuser.schule`, the new default); default subject filter `Speiseplan` | §5.5 |
-| R15 | Staleness detection | `sensor.school_menu_last_import` (timestamp, diagnostic) instead of an alarm — holidays are absence of data, so an alarm would false-fire every Ferien | §4.3 |
+| R15 | Staleness detection | `sensor.school_menu_last_import` (timestamp, diagnostic) instead of an alarm — holidays are absence of data, so an alarm would false-fire every Ferien. **Amended 2026-11-16 (HAS-7):** a failing website fetch is log-only for the same reason | §4.3 |
 
 **Added after the grilling, from the operator's mail setup:** two senders
 (`Maximilian.Stollberg@`, `Lena.Putzmann@annie-heuser.schule`) send the same weekly plan, and the subject
@@ -845,3 +850,68 @@ HAS-3 fix. The hash short-circuit now applies to the **IMAP path only**, where i
 second teacher's copy. A manual import always compares the parsed lines with the stored week: identical
 lines still report "unverändert" and record nothing new; different lines overwrite the week and fan out.
 The hash is not recorded twice. Ships in 0.3.0.
+
+**Amendment 2026-11-05 — a manual mail check reports what it found (HAS-6).** A press of
+`button.school_menu_check_mail` (or `school_menu.check_mail`) that found only already stored menus
+gave no feedback at all: the forced poll ran, layers 1–2 of §5.5 absorbed the mail, and nothing
+changed. Seen on 2026-11-05: KW 46 had been imported by the 16:15 poll, the 16:41 press looked like a
+miss. Plan: `docs/plans/check-mail-feedback.md`.
+
+- **Outcome notification, forced checks only.** After a *successful* forced check,
+  `persistent_notification` id `school_menu_import_ok` (the manual-import id, so the latest manual
+  action replaces the previous card) states the outcome in German, in this precedence:
+  1. Something imported: `Neuer Speiseplan importiert: KW 46 (5 Tage).` — one entry per imported
+     week, ISO weeks ascending.
+  2. Matching mails found, all already stored: `Kein neuer Speiseplan. Bereits importiert: KW 46.` —
+     the distinct ISO weeks of the attachments found, from the stored record that holds the
+     attachment's content hash, or from the parsed week when the content was re-parsed unchanged.
+  3. No matching mail with a PDF in the search window:
+     `Keine Speiseplan-Mail in den letzten 14 Tagen gefunden.`
+  When attachments were refused (parse error, shrink guard), the text gets
+  ` N Anhang/Anhänge nicht übernommen, siehe separate Meldung.` appended; the per-attachment
+  `school_menu_import_error` notification is unchanged.
+- **Scheduled polls unchanged.** §10 R8 holds for the timer: no success notification, INFO log and
+  `last_import` only. A forced check is an operator action, the same class as a manual `import_pdf`,
+  which already reports success (§7).
+- **Failures unchanged.** A skipped or failed forced check still raises `check_mail_skipped` /
+  `check_mail_failed` and posts no outcome notification.
+- **Mechanism.** The coordinator collects an outcome record only while a forced check runs; the
+  ingest path records `imported` / `already_stored` / `refused` per attachment. `MenuStore` gains a
+  lookup from content hash to the ISO week key that recorded it.
+
+**Amendment 2026-11-16 — the school website as a second, time-boxed source (HAS-7).** The school
+publishes the current menu at `https://www.annie-heuser-schule.de/wp-content/uploads/AHS-Speiseplan.pdf`.
+Verified 2026-11-16: 2 pages, text layer, read unchanged by `extract_lines` + `parse_lines`; the server
+sends `ETag`, `Last-Modified` and `Cache-Control: max-age=31536000`, and on Monday of KW 47 it still
+served KW 46 — a stale file is the normal case. Plan: `docs/plans/website-source.md`.
+
+- **Window** (`date_logic.web_check_week(now)`, pure): Sunday from 18:00 local → the Monday after;
+  Monday–Friday → this week's Monday; Saturday and Sunday before 18:00 → `None`.
+- **Gate.** A check runs only when the window yields a Monday **and** `MenuStore.has_week(key)` is
+  false for its ISO week. Once the week is stored — by mail, website or manual import — no request is
+  made until the next Sunday 18:00.
+- **Timer.** `async_track_time_change` at every even hour (minute 0, second 0), plus one background
+  check at entry setup so a restart does not wait up to two hours. Both are torn down on unload.
+- **Fetch** (`web_client.py`, the only HTTP caller): HA's shared `aiohttp` session, `GET` with
+  `Cache-Control: no-cache`, conditional on the `ETag` / `Last-Modified` of the last `200` in this HA
+  run; 30 s timeout; bodies over 10 MB are refused. `304` → nothing to do.
+- **Ingest.** The bytes take the IMAP path: the three dedup layers of §5.5 and the shrink guard, with
+  `source = "web"` and `source_file` = the URL's file name. The hash short-circuit and the shrink guard
+  apply to every *unattended* source (`imap`, `web`); a manual import is unchanged. A stale file hits
+  layer 1, or stores an older week harmlessly; the gate keeps polling because the target week is still
+  missing.
+- **Serialisation.** The website check has its own lock; a check that finds it held returns at once,
+  so the timer and the setup check never fetch twice. It does not take `poll_lock`: a website fetch
+  of up to 30 s must not make a manual mail check report `check_mail_skipped`. A website ingest
+  overlapping an IMAP ingest of the same week is absorbed by the dedup layers.
+- **Refusal text.** The `school_menu_import_error` text names the file but no longer says "aus der
+  E-Mail" (`Konnte <file> nicht übernehmen (<reason>). …`), since it now covers both unattended
+  sources.
+- **Configuration.** `web_url` in the entry data, default the school URL, read with a default so
+  existing entries need no migration. The options form shows it; an empty value disables the source.
+  Only `https://` URLs are accepted. The source works with or without a mailbox.
+- **Notifications.** None on success or fetch failure (§7); the manual mail check does not fetch the
+  website.
+- **Diagnostics** show the effective URL and the last `ETag` / `Last-Modified` seen.
+- **Options form limitation.** The field lives in the existing mailbox options form, which requires a
+  mailbox host; without a mailbox the URL keeps its default.

@@ -1,6 +1,6 @@
 [project]
 name = "school-menu"
-version = "0.3.0"
+version = "0.5.0"
 description = "Home Assistant integration exposing the school's weekly lunch menu as sensors"
 requires-python = ">=3.14.2"
 
@@ -18,6 +18,8 @@ markers = [
     "m3: milestone 3 acceptance",
     "m4: milestone 4 acceptance",
     "m5: any school sender and manual mail check (HAS-1) acceptance",
+    "m6: manual mail check reports its outcome (HAS-6) acceptance",
+    "m7: school website as a second source (HAS-7) acceptance",
 ]
 
 [tool.coverage.run]

@@ -22,6 +22,7 @@ from homeassistant.helpers.selector import (
     TextSelectorConfig,
     TextSelectorType,
 )
+from yarl import URL
 
 from .const import (
     CONF_FOLDER,
@@ -34,6 +35,7 @@ from .const import (
     CONF_SSL,
     CONF_SUBJECT_FILTER,
     CONF_USERNAME,
+    CONF_WEB_URL,
     DEFAULT_FOLDER,
     DEFAULT_NAME,
     DEFAULT_PORT,
@@ -41,6 +43,7 @@ from .const import (
     DEFAULT_SENDERS,
     DEFAULT_SSL,
     DEFAULT_SUBJECT_FILTER,
+    DEFAULT_WEB_URL,
     DOMAIN,
     MIN_SCAN_INTERVAL_MINUTES,
     SINGLE_ENTRY_UNIQUE_ID,
@@ -84,6 +87,7 @@ def _mailbox_schema(current: Mapping[str, Any]) -> vol.Schema:
                     min=MIN_SCAN_INTERVAL_MINUTES, max=1440, mode=NumberSelectorMode.BOX
                 )
             ),
+            vol.Optional(CONF_WEB_URL, default=current.get(CONF_WEB_URL, DEFAULT_WEB_URL)): str,
         }
     )
 
@@ -97,7 +101,18 @@ def _normalise(user_input: dict[str, Any]) -> dict[str, Any]:
     ]
     cleaned[CONF_HOST] = cleaned.get(CONF_HOST, "").strip()
     cleaned[CONF_SUBJECT_FILTER] = cleaned.get(CONF_SUBJECT_FILTER, "").strip()
+    cleaned[CONF_WEB_URL] = cleaned.get(CONF_WEB_URL, DEFAULT_WEB_URL).strip()
     return cleaned
+
+
+def _usable_web_url(url: str) -> bool:
+    if not url:
+        return True
+    try:
+        parsed = URL(url)
+    except ValueError:
+        return False
+    return parsed.scheme == "https" and bool(parsed.host)
 
 
 def _errors(cleaned: dict[str, Any]) -> dict[str, str]:
@@ -114,6 +129,8 @@ def _errors(cleaned: dict[str, Any]) -> dict[str, str]:
         return {CONF_SUBJECT_FILTER: "no_subject_filter"}
     if not cleaned[CONF_PASSWORD]:
         return {CONF_PASSWORD: "no_password"}
+    if not _usable_web_url(cleaned[CONF_WEB_URL]):
+        return {CONF_WEB_URL: "invalid_web_url"}
     return {}
 
 

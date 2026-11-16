@@ -8,6 +8,8 @@ DATE_RANGE = re.compile(
     r"(\d{1,2})\.(\d{1,2})\.(\d{2}(?:\d{2})?)\s*[–—-]\s*(\d{1,2})\.(\d{1,2})\.(\d{2}(?:\d{2})?)"
 )
 WEEKDAY_COUNT = 5
+SUNDAY = 6
+SATURDAY = 5
 
 
 def parse_header_range(line: str) -> datetime.date | None:
@@ -47,3 +49,12 @@ def target_date(
         if candidate.weekday() < WEEKDAY_COUNT:
             return candidate
         ahead += 1
+
+
+def web_check_week(now: datetime.datetime, start_hour: int) -> datetime.date | None:
+    today = now.date()
+    if today.weekday() == SATURDAY:
+        return None
+    if today.weekday() == SUNDAY:
+        return today + datetime.timedelta(days=1) if now.hour >= start_hour else None
+    return monday_of(today)

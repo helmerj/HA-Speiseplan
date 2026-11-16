@@ -93,12 +93,14 @@
           "folder": "Folder",
           "senders": "Senders",
           "subject_filter": "Subject contains",
-          "scan_interval_minutes": "Scan interval (minutes)"
+          "scan_interval_minutes": "Scan interval (minutes)",
+          "web_url": "School website PDF"
         },
         "data_description": {
           "senders": "Who may send the menu. A full address, or @domain for everyone at that domain (default: @annie-heuser.schule).",
           "subject_filter": "A mail counts only if its subject contains this text (any case) and it has a PDF attachment.",
-          "scan_interval_minutes": "How often the mailbox is checked, 5–1440 minutes. Use the 'Check mail now' button for an immediate check."
+          "scan_interval_minutes": "How often the mailbox is checked, 5–1440 minutes. Use the 'Check mail now' button for an immediate check.",
+          "web_url": "Public menu PDF, checked every 2 hours from Sunday 18:00 until this week's menu is stored. Leave empty to turn it off."
         }
       }
     },
@@ -107,7 +109,8 @@
       "no_password": "Enter the mailbox password.",
       "no_host": "Enter the IMAP server host name.",
       "invalid_sender": "Every sender must be a single e-mail address or @domain, e.g. @annie-heuser.schule.",
-      "no_subject_filter": "Enter a subject filter; an empty filter would match every mail."
+      "no_subject_filter": "Enter a subject filter; an empty filter would match every mail.",
+      "invalid_web_url": "Enter an https:// address, or leave the field empty to turn the website check off."
     }
   },
   "entity": {
