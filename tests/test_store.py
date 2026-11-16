@@ -165,3 +165,24 @@ async def test_a_content_hash_leads_back_to_the_week_that_stored_it(hass: HomeAs
 
     assert store.week_key_for_hash("hash-40") == "2026-W40"
     assert store.week_key_for_hash("unknown") is None
+
+
+async def test_has_week_knows_which_iso_weeks_are_stored(hass: HomeAssistant) -> None:
+    store = MenuStore(hass, "entry-1")
+    await store.async_load()
+    await store.async_save_week(WEEK_40, source="manual")
+
+    assert store.has_week("2026-W40")
+    assert not store.has_week("2026-W41")
+
+
+async def test_a_pruned_week_is_no_longer_stored(hass: HomeAssistant) -> None:
+    store = MenuStore(hass, "entry-1")
+    await store.async_load()
+    first = datetime.date(2026, 9, 7)
+    for offset in range(5):
+        start = first + datetime.timedelta(weeks=offset)
+        await store.async_save_week(_week(start, content_hash=f"h{offset}"), source="imap")
+
+    assert not store.has_week("2026-W37")
+    assert store.has_week("2026-W41")

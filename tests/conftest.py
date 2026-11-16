@@ -26,6 +26,18 @@ def no_release_check():
 
 
 @pytest.fixture(autouse=True)
+def web_fetch():
+    from custom_components.school_menu.web_client import Validators, WebFetchResult
+
+    unchanged = WebFetchResult(payload=None, validators=Validators(etag=None, last_modified=None))
+    with patch(
+        "custom_components.school_menu.coordinator.async_fetch_menu_pdf",
+        AsyncMock(return_value=unchanged),
+    ) as fetch:
+        yield fetch
+
+
+@pytest.fixture(autouse=True)
 async def german_timezone(hass):
     await hass.config.async_update(time_zone="Europe/Berlin")
 

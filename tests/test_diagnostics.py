@@ -28,3 +28,17 @@ async def test_credentials_are_redacted(hass: HomeAssistant, hass_client) -> Non
     assert diagnostics["data"]["password"] == "**REDACTED**"
     assert diagnostics["data"]["username"] == "**REDACTED**"
     assert diagnostics["data"]["host"] == "imap.example.org"
+
+
+async def test_diagnostics_show_the_website_source(hass: HomeAssistant, hass_client) -> None:
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=SINGLE_ENTRY_UNIQUE_ID, data={})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    diagnostics = await get_diagnostics_for_config_entry(hass, hass_client, entry)
+
+    assert diagnostics["website"]["url"] == (
+        "https://www.annie-heuser-schule.de/wp-content/uploads/AHS-Speiseplan.pdf"
+    )
+    assert diagnostics["website"]["etag"] is None

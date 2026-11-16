@@ -10,8 +10,10 @@ from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
+from yarl import URL
 
 from .const import (
     CHECK_MAIL_COOLDOWN_SECONDS,
@@ -24,11 +26,13 @@ from .const import (
     CONF_SSL,
     CONF_SUBJECT_FILTER,
     CONF_USERNAME,
+    CONF_WEB_URL,
     DEFAULT_FOLDER,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL_MINUTES,
     DEFAULT_SSL,
     DEFAULT_SUBJECT_FILTER,
+    DEFAULT_WEB_URL,
     DOMAIN,
     FAILURES_BEFORE_NOTIFYING,
     IMAP_POLL_TIMEOUT_SECONDS,
@@ -38,8 +42,11 @@ from .const import (
     NOTIFICATION_OK_ID,
     REASON_FEWER_DAYS,
     SOURCE_IMAP,
+    SOURCE_WEB,
+    UNATTENDED_SOURCES,
+    WEB_WINDOW_START_HOUR,
 )
-from .date_logic import iso_week_key
+from .date_logic import iso_week_key, web_check_week
 from .imap_client import (
     ImapAuthError,
     ImapSettings,
@@ -50,6 +57,7 @@ from .imap_client import (
 from .models import DayMenu, MenuParseError, ParsedWeek
 from .parser import extract_lines, parse_lines
 from .store import MenuStore
+from .web_client import Validators, WebFetchError, async_fetch_menu_pdf
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,13 +78,22 @@ def imap_settings(entry: ConfigEntry) -> ImapSettings | None:
     )
 
 
-def _parse_attachment(attachment: MailAttachment, content_hash: str) -> ParsedWeek:
+def _parse_payload(
+    payload: bytes,
+    filename: str,
+    content_hash: str,
+    fallback_week_start: datetime.date | None,
+) -> ParsedWeek:
     return parse_lines(
-        extract_lines(attachment.payload),
-        source_file=attachment.filename,
+        extract_lines(payload),
+        source_file=filename,
         content_hash=content_hash,
-        fallback_week_start=attachment.fallback_week_start(),
+        fallback_week_start=fallback_week_start,
     )
+
+
+def web_url(entry: ConfigEntry) -> str:
+    return str(entry.data.get(CONF_WEB_URL, DEFAULT_WEB_URL)).strip()
 
 
 @dataclass(slots=True)
@@ -130,6 +147,8 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
         self._last_forced_check: datetime.datetime | None = None
         self._check_running = False
         self._report: CheckReport | None = None
+        self.web_validators = Validators(etag=None, last_modified=None)
+        self._web_lock = asyncio.Lock()
 
     async def async_initialise(self) -> None:
         await self.store.async_load()
@@ -206,44 +225,83 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
             notification_id=NOTIFICATION_OK_ID,
         )
 
+    async def async_check_website(self) -> None:
+        url = web_url(self.config_entry)
+        if not url or self._web_lock.locked():
+            return
+        monday = web_check_week(dt_util.now(), WEB_WINDOW_START_HOUR)
+        if monday is None or self.store.has_week(iso_week_key(monday)):
+            return
+        async with self._web_lock:
+            try:
+                result = await async_fetch_menu_pdf(
+                    async_get_clientsession(self.hass), url, self.web_validators
+                )
+            except WebFetchError as err:
+                _LOGGER.warning("Could not fetch the school menu from %s: %s", url, err)
+                return
+            self.web_validators = result.validators
+            if result.payload is None:
+                _LOGGER.debug("School menu at %s is unchanged", url)
+                return
+            await self._async_ingest_payload(
+                result.payload, URL(url).name or "website.pdf", source=SOURCE_WEB
+            )
+
     def _reject(self, filename: str, content_hash: str, reason: str) -> None:
         self.rejected_hashes.add(content_hash)
         if self._report is not None:
             self._report.refused += 1
-        _LOGGER.warning("Not importing %s from the mailbox: %s", filename, reason)
+        _LOGGER.warning("Not importing %s: %s", filename, reason)
         persistent_notification.async_create(
             self.hass,
-            f"Konnte {filename} aus der E-Mail nicht übernehmen ({reason}). "
+            f"Konnte {filename} nicht übernehmen ({reason}). "
             f"Die gespeicherte Woche bleibt unverändert.",
             title="School menu",
             notification_id=NOTIFICATION_ERROR_ID,
         )
 
     async def _async_ingest(self, attachment: MailAttachment) -> None:
-        content_hash = hashlib.sha256(attachment.payload).hexdigest()
+        await self._async_ingest_payload(
+            attachment.payload,
+            attachment.filename,
+            source=SOURCE_IMAP,
+            fallback_week_start=attachment.fallback_week_start(),
+            expected_week=attachment.week_number,
+        )
+
+    async def _async_ingest_payload(
+        self,
+        payload: bytes,
+        filename: str,
+        *,
+        source: str,
+        fallback_week_start: datetime.date | None = None,
+        expected_week: int | None = None,
+    ) -> None:
+        content_hash = hashlib.sha256(payload).hexdigest()
         if self.store.knows_hash(content_hash) or content_hash in self.rejected_hashes:
-            _LOGGER.debug("Skipping %s, content hash already seen", attachment.filename)
+            _LOGGER.debug("Skipping %s, content hash already seen", filename)
             self._record_stored(self.store.week_key_for_hash(content_hash))
             return
         try:
             week = await self.hass.async_add_executor_job(
-                _parse_attachment, attachment, content_hash
+                _parse_payload, payload, filename, content_hash, fallback_week_start
             )
         except MenuParseError as err:
-            self._reject(attachment.filename, content_hash, err.reason)
+            self._reject(filename, content_hash, err.reason)
             return
-        expected = attachment.week_number
-        if expected is not None and week.week_start.isocalendar().week != expected:
+        if expected_week is not None and week.week_start.isocalendar().week != expected_week:
             _LOGGER.warning(
                 "Subject of %s says KW%s but the PDF header says %s; the header wins",
-                attachment.filename,
-                expected,
+                filename,
+                expected_week,
                 iso_week_key(week.week_start),
             )
-        await self.async_import_week(week, source=SOURCE_IMAP)
+        await self.async_import_week(week, source=source)
 
     async def async_import_week(self, week: ParsedWeek, *, source: str) -> bool:
-        if source == SOURCE_IMAP and self.store.knows_hash(week.content_hash):
+        if source in UNATTENDED_SOURCES and self.store.knows_hash(week.content_hash):
             _LOGGER.debug("Skipping %s, content hash already stored", week.source_file)
             self._record_stored(iso_week_key(week.week_start))
             return False
@@ -259,7 +317,7 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
             == incoming
         )
 
-        if source == SOURCE_IMAP and existing is not None and not unchanged:
+        if source in UNATTENDED_SOURCES and existing is not None and not unchanged:
             stored_days = set(existing.get("days", {}))
             if stored_days and set(incoming) < stored_days:
                 self._reject(week.source_file, week.content_hash, REASON_FEWER_DAYS)

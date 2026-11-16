@@ -225,3 +225,62 @@ async def test_the_options_form_offers_the_school_domain_by_default(hass: HomeAs
 
     assert defaults["senders"] == ["@annie-heuser.schule"]
     assert defaults["subject_filter"] == "Speiseplan"
+
+
+async def _open_options(hass: HomeAssistant) -> tuple[MockConfigEntry, dict]:
+    entry = MockConfigEntry(domain=DOMAIN, unique_id=SINGLE_ENTRY_UNIQUE_ID, data={})
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry, await hass.config_entries.options.async_init(entry.entry_id)
+
+
+async def test_the_options_form_offers_the_school_website_by_default(hass: HomeAssistant) -> None:
+    _, result = await _open_options(hass)
+    defaults = {
+        str(key): key.default() for key in result["data_schema"].schema if callable(key.default)
+    }
+
+    assert defaults["web_url"] == (
+        "https://www.annie-heuser-schule.de/wp-content/uploads/AHS-Speiseplan.pdf"
+    )
+
+
+@pytest.mark.parametrize(
+    ("given", "stored"),
+    [
+        ("", ""),
+        ("   ", ""),
+        (" https://example.org/plan.pdf ", "https://example.org/plan.pdf"),
+    ],
+)
+async def test_the_options_flow_stores_or_clears_the_website(
+    hass: HomeAssistant, given: str, stored: str
+) -> None:
+    from unittest.mock import patch
+
+    entry, result = await _open_options(hass)
+    with patch("custom_components.school_menu._imap_client_factory"):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {**MAILBOX_INPUT, "web_url": given}
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.data["web_url"] == stored
+
+
+@pytest.mark.parametrize(
+    "given", ["http://example.org/plan.pdf", "example.org/plan.pdf", "https://", "ftp://x.de/a"]
+)
+async def test_the_options_flow_refuses_an_unusable_website(
+    hass: HomeAssistant, given: str
+) -> None:
+    entry, result = await _open_options(hass)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**MAILBOX_INPUT, "web_url": given}
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"web_url": "invalid_web_url"}
+    assert entry.data == {}

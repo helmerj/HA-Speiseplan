@@ -31,6 +31,7 @@ from .const import (
     SERVICE_CHECK_MAIL,
     SERVICE_IMPORT_PDF,
     SOURCE_MANUAL,
+    WEB_CHECK_EVERY_HOURS,
 )
 from .coordinator import SchoolMenuCoordinator
 from .imap_client import create_client
@@ -198,6 +199,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_create_background_task(
+        hass, coordinator.async_check_website(), f"{DOMAIN}_first_website_check"
+    )
 
     @callback
     def _at_midnight(now: datetime.datetime) -> None:
@@ -208,7 +212,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         coordinator.async_update_listeners()
 
     entry.async_on_unload(async_track_time_change(hass, _at_midnight, hour=0, minute=0, second=0))
+
+    async def _check_website(now: datetime.datetime) -> None:
+        await coordinator.async_check_website()
+
     entry.async_on_unload(hass.bus.async_listen(EVENT_CORE_CONFIG_UPDATE, _on_core_config))
+    entry.async_on_unload(
+        async_track_time_change(
+            hass,
+            _check_website,
+            hour=list(range(0, 24, WEB_CHECK_EVERY_HOURS)),
+            minute=0,
+            second=0,
+        )
+    )
     return True
 
 

@@ -81,6 +81,23 @@ mail. Set *Senders* back to full addresses before you downgrade.
 There is no alarm when no menu arrives — school holidays look exactly like that. The `Stand:` line on
 the card below shows when the last menu came in.
 
+## School website (automatic fallback)
+
+The school also publishes the menu at
+<https://www.annie-heuser-schule.de/wp-content/uploads/AHS-Speiseplan.pdf>. School Menu checks that
+file **every 2 hours from Sunday 18:00**, and only until the menu for the current school week is
+stored, whether it came from the mailbox, the website or a manual import. On Saturdays, and once the
+week is in, no request is made. It works with or without a mailbox.
+
+- The website file takes the same path as a mail attachment: a week already stored is not imported
+  again, and a file that would shrink a stored week is refused.
+- The website often still shows last week's menu on Monday morning. That is expected; the next check
+  two hours later tries again.
+- An unreachable website only writes a warning to the log; there is no notification. A successful
+  import shows up on `sensor.school_menu_last_import` with `source: web`.
+- To use another address, or to turn the check off, change or clear *School website PDF* under
+  **Settings → Devices & services → School Menu → Configure**.
+
 ## Dashboard card
 
 Requires [Mushroom](https://github.com/piitaya/lovelace-mushroom) (HACS → Frontend → Mushroom).

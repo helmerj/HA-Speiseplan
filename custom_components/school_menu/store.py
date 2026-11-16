@@ -66,6 +66,9 @@ class MenuStore:
                 return key
         return None
 
+    def has_week(self, week_key: str) -> bool:
+        return week_key in self.weeks
+
     def stored_week(self, week: ParsedWeek) -> dict[str, Any] | None:
         return self.weeks.get(iso_week_key(week.week_start))
 

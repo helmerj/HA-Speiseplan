@@ -79,7 +79,16 @@ IMAP_TEARDOWN_TIMEOUT_SECONDS = 5
 REASON_FEWER_DAYS = "fewer_days"
 
 SOURCE_IMAP = "imap"
+SOURCE_WEB = "web"
+UNATTENDED_SOURCES = frozenset({SOURCE_IMAP, SOURCE_WEB})
 NOTIFICATION_IMAP_ID = "school_menu_imap_error"
+
+CONF_WEB_URL = "web_url"
+DEFAULT_WEB_URL = "https://www.annie-heuser-schule.de/wp-content/uploads/AHS-Speiseplan.pdf"
+WEB_CHECK_EVERY_HOURS = 2
+WEB_WINDOW_START_HOUR = 18
+WEB_TIMEOUT_SECONDS = 30
+WEB_MAX_BYTES = 10 * 1024 * 1024
 
 UPDATE_VERSION = "version"
 UPDATE_TITLE = "School Menu"
