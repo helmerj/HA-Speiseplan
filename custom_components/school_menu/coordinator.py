@@ -8,9 +8,10 @@ from dataclasses import dataclass, field
 
 from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 from yarl import URL
@@ -18,6 +19,7 @@ from yarl import URL
 from .const import (
     CHECK_MAIL_COOLDOWN_SECONDS,
     CONF_FOLDER,
+    CONF_HOLIDAY_CALENDAR,
     CONF_HOST,
     CONF_PASSWORD,
     CONF_PORT,
@@ -27,6 +29,7 @@ from .const import (
     CONF_SUBJECT_FILTER,
     CONF_USERNAME,
     CONF_WEB_URL,
+    CONF_WORKDAY_CALENDAR,
     DEFAULT_FOLDER,
     DEFAULT_PORT,
     DEFAULT_SCAN_INTERVAL_MINUTES,
@@ -35,6 +38,8 @@ from .const import (
     DEFAULT_WEB_URL,
     DOMAIN,
     FAILURES_BEFORE_NOTIFYING,
+    HOLIDAY_LOOKAHEAD_DAYS,
+    HOLIDAY_RETRY_SECONDS,
     IMAP_POLL_TIMEOUT_SECONDS,
     MIN_SCAN_INTERVAL_MINUTES,
     NOTIFICATION_ERROR_ID,
@@ -46,7 +51,8 @@ from .const import (
     UNATTENDED_SOURCES,
     WEB_WINDOW_START_HOUR,
 )
-from .date_logic import iso_week_key, web_check_week
+from .date_logic import iso_week_key, web_check_week, week_dates
+from .holidays import async_lookup_no_school, merge
 from .imap_client import (
     ImapAuthError,
     ImapSettings,
@@ -94,6 +100,13 @@ def _parse_payload(
 
 def web_url(entry: ConfigEntry) -> str:
     return str(entry.data.get(CONF_WEB_URL, DEFAULT_WEB_URL)).strip()
+
+
+def calendars(entry: ConfigEntry) -> tuple[str | None, str | None]:
+    return (
+        entry.data.get(CONF_HOLIDAY_CALENDAR) or None,
+        entry.data.get(CONF_WORKDAY_CALENDAR) or None,
+    )
 
 
 @dataclass(slots=True)
@@ -149,6 +162,12 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
         self._report: CheckReport | None = None
         self.web_validators = Validators(etag=None, last_modified=None)
         self._web_lock = asyncio.Lock()
+        self.no_school: dict[datetime.date, str] = {}
+        self._ferien: dict[datetime.date, str] = {}
+        self._feiertage: dict[datetime.date, str] = {}
+        self._holiday_lock = asyncio.Lock()
+        self._holiday_waiting = False
+        self._holiday_retry: CALLBACK_TYPE | None = None
 
     async def async_initialise(self) -> None:
         await self.store.async_load()
@@ -232,6 +251,11 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
         monday = web_check_week(dt_util.now(), WEB_WINDOW_START_HOUR)
         if monday is None or self.store.has_week(iso_week_key(monday)):
             return
+        today = dt_util.now().date()
+        remaining = [day for day in week_dates(monday) if day >= today]
+        if remaining and all(day in self.no_school for day in remaining):
+            _LOGGER.debug("Week %s is all holidays, not fetching the menu", iso_week_key(monday))
+            return
         async with self._web_lock:
             try:
                 result = await async_fetch_menu_pdf(
@@ -247,6 +271,51 @@ class SchoolMenuCoordinator(DataUpdateCoordinator[None]):
             await self._async_ingest_payload(
                 result.payload, URL(url).name or "website.pdf", source=SOURCE_WEB
             )
+
+    async def async_refresh_no_school(self) -> None:
+        if self._holiday_waiting:
+            return
+        self._holiday_waiting = self._holiday_lock.locked()
+        async with self._holiday_lock:
+            self._holiday_waiting = False
+            today = dt_util.now().date()
+            holiday_calendar, workday_calendar = calendars(self.config_entry)
+            lookup = await async_lookup_no_school(
+                self.hass, holiday_calendar, workday_calendar, today, HOLIDAY_LOOKAHEAD_DAYS
+            )
+            if lookup.ferien is not None:
+                self._ferien = lookup.ferien
+            if lookup.feiertage is not None:
+                self._feiertage = lookup.feiertage
+            if lookup.failed:
+                self._schedule_holiday_retry()
+            found = {
+                day: label
+                for day, label in merge(self._ferien, self._feiertage).items()
+                if day >= today
+            }
+            if found != self.no_school:
+                self.no_school = found
+                self.async_update_listeners()
+
+    def _schedule_holiday_retry(self) -> None:
+        self.async_cancel_holiday_retry()
+        self._holiday_retry = async_call_later(
+            self.hass, HOLIDAY_RETRY_SECONDS, self._retry_holidays
+        )
+
+    @callback
+    def _retry_holidays(self, now: datetime.datetime) -> None:
+        self._holiday_retry = None
+        self.config_entry.async_create_background_task(
+            self.hass, self.async_refresh_no_school(), f"{DOMAIN}_holiday_retry"
+        )
+
+    @callback
+    def async_cancel_holiday_retry(self) -> None:
+        if self._holiday_retry is not None:
+            self._holiday_retry()
+            self._holiday_retry = None
 
     def _reject(self, filename: str, content_hash: str, reason: str) -> None:
         self.rejected_hashes.add(content_hash)

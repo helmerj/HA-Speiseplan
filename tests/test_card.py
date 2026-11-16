@@ -144,7 +144,7 @@ async def test_on_sunday_monday_is_tomorrow(
     }
 
 
-async def test_a_weekend_with_no_following_week_says_kein_mittagessen_twice(
+async def test_a_weekend_without_the_next_week_says_the_menu_is_not_in_yet(
     hass: HomeAssistant, config_entry: MockConfigEntry, freezer
 ) -> None:
     freezer.move_to("2026-10-03 12:00:00+02:00")
@@ -155,13 +155,13 @@ async def test_a_weekend_with_no_following_week_says_kein_mittagessen_twice(
         TODAY: {"primary": "Heute · Samstag, 03.10.", "secondary": "Kein Mittagessen"},
         TOMORROW: {
             "primary": "Montag, 05.10.",
-            "secondary": "Kein Mittagessen\nStand: 03.10.",
+            "secondary": "Noch keine Menüinformationen vorhanden\nStand: 03.10.",
         },
     }
     assert not _bare_none(card_text(hass))
 
 
-async def test_a_holiday_school_day_says_kein_mittagessen_and_keeps_the_stand_line(
+async def test_a_school_day_without_a_menu_says_it_is_not_in_yet_and_keeps_the_stand_line(
     hass: HomeAssistant, config_entry: MockConfigEntry, freezer
 ) -> None:
     freezer.move_to("2026-09-30 09:00:00+02:00")
@@ -172,10 +172,13 @@ async def test_a_holiday_school_day_says_kein_mittagessen_and_keeps_the_stand_li
     assert hass.states.get(TODAY).attributes["reason"] == "no_menu"
 
     assert render_card(hass) == {
-        TODAY: {"primary": "Heute · Mittwoch, 07.10.", "secondary": "Kein Mittagessen"},
+        TODAY: {
+            "primary": "Heute · Mittwoch, 07.10.",
+            "secondary": "Noch keine Menüinformationen vorhanden",
+        },
         TOMORROW: {
             "primary": "Morgen · Donnerstag, 08.10.",
-            "secondary": "Kein Mittagessen\nStand: 30.09.",
+            "secondary": "Noch keine Menüinformationen vorhanden\nStand: 30.09.",
         },
     }
     assert not _bare_none(card_text(hass))
@@ -236,10 +239,13 @@ async def test_before_any_import_the_stand_line_says_so(
     await _loaded(hass, config_entry)
 
     assert render_card(hass) == {
-        TODAY: {"primary": "Heute · Mittwoch, 30.09.", "secondary": "Kein Mittagessen"},
+        TODAY: {
+            "primary": "Heute · Mittwoch, 30.09.",
+            "secondary": "Noch keine Menüinformationen vorhanden",
+        },
         TOMORROW: {
             "primary": "Morgen · Donnerstag, 01.10.",
-            "secondary": "Kein Mittagessen\nStand: noch kein Import",
+            "secondary": "Noch keine Menüinformationen vorhanden\nStand: noch kein Import",
         },
     }
 
@@ -322,3 +328,28 @@ async def test_a_missing_integration_still_renders_an_icon(
             hass.states.async_set(entity_id, state, {})
 
     assert render_icons(hass) == {TODAY: "mdi:food", TOMORROW: "mdi:food"}
+
+
+async def test_a_ferien_day_says_ferien(hass: HomeAssistant, freezer) -> None:
+    from tests.fake_calendar import FERIEN, add_calendars, ferien_calendar
+
+    freezer.move_to("2026-12-23 09:00:00+01:00")
+    await add_calendars(hass, ferien_calendar())
+    entry = MockConfigEntry(
+        domain=DOMAIN, unique_id="school_menu_single_entry", data={"holiday_calendar": FERIEN}
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert render_card(hass) == {
+        TODAY: {
+            "primary": "Heute · Mittwoch, 23.12.",
+            "secondary": "Keine Menüinformationen - Ferien",
+        },
+        TOMORROW: {
+            "primary": "Morgen · Donnerstag, 24.12.",
+            "secondary": "Keine Menüinformationen - Ferien\nStand: noch kein Import",
+        },
+    }
+    assert not _bare_none(card_text(hass))

@@ -267,7 +267,8 @@ re-import — impossible in practice, because the IMAP search window is 14 days.
 | `main` / `side` / `dessert` | positional lines 1/2/3; `None` when that line does not exist |
 | `lines` | full list, the honest representation — holds 4–5 entries if the PDF ever has them |
 | `source_file`, `ingested_at` | provenance of the week this day came from |
-| `reason` | only when state is `none`: `weekend` or `no_menu` |
+| `reason` | only when state is `none`: `weekend`, `holiday` (amendment 2026-11-16, HAS-8) or `no_menu` |
+| `holiday` | only with `reason: holiday`: the calendar label, e.g. `Weihnachtsferien Berlin` or `Feiertag` |
 
 | | `sensor.school_menu_last_import` (§10 R15) |
 |---|---|
@@ -677,7 +678,7 @@ All 15 branches closed. These are binding; §§1–9 above already reflect them.
 
 | # | Branch | Resolution | Lands in |
 |---|---|---|---|
-| R1 | No-menu sensor state | Literal string `none` (your brief over the HA `unknown` idiom), `reason: weekend\|no_menu` | §4.3 |
+| R1 | No-menu sensor state | Literal string `none` (your brief over the HA `unknown` idiom), `reason: weekend\|no_menu`. **Amended 2026-11-16 (HAS-8):** plus `reason: holiday` from the configured calendars | §4.3 |
 | R2 | Config entry count | Exactly one, enforced by fixed unique id; `config_entry_id` removed from the service | §5.3, §5.4 |
 | R3 | `tomorrow` on Fri/Sat/Sun | Next weekday — all three resolve to Monday. **Amended 2026-09-26:** the sensor is named for what it is — `sensor.school_menu_next_school_day` ("Next school day"), not `_tomorrow` | §6 |
 | R4 | Store retention | Newest 4 weeks by `week_start`, unchanged; safe because ≤1 future week is ever in flight | §4.2 |
@@ -691,7 +692,7 @@ All 15 branches closed. These are binding; §§1–9 above already reflect them.
 | R12 | Parser seam | `extract_lines(bytes)` / `parse_lines(lines)`; synthetic cases are string lists, no fixture PDFs | §5.1, §8 |
 | R13 | Coordinator | `DataUpdateCoordinator` with `update_interval=None` in M1; `CoordinatorEntity` sensors | §6 |
 | R14 | Mail matching | Sender **and** subject both required; subject = case-insensitive substring on the RFC 2047-decoded header. **Amended 2026-10-02 (HAS-1):** sender may be a whole domain (`@annie-heuser.schule`, the new default); default subject filter `Speiseplan` | §5.5 |
-| R15 | Staleness detection | `sensor.school_menu_last_import` (timestamp, diagnostic) instead of an alarm — holidays are absence of data, so an alarm would false-fire every Ferien. **Amended 2026-11-16 (HAS-7):** a failing website fetch is log-only for the same reason | §4.3 |
+| R15 | Staleness detection | `sensor.school_menu_last_import` (timestamp, diagnostic) instead of an alarm — holidays are absence of data, so an alarm would false-fire every Ferien. **Amended 2026-11-16 (HAS-7):** a failing website fetch is log-only for the same reason. **Amended 2026-11-16 (HAS-8):** the menu sensors now know holidays from calendars; `last_import` stays the only staleness signal, still no alarm | §4.3 |
 
 **Added after the grilling, from the operator's mail setup:** two senders
 (`Maximilian.Stollberg@`, `Lena.Putzmann@annie-heuser.schule`) send the same weekly plan, and the subject
@@ -915,3 +916,46 @@ served KW 46 — a stale file is the normal case. Plan: `docs/plans/website-sour
 - **Diagnostics** show the effective URL and the last `ETag` / `Last-Modified` seen.
 - **Options form limitation.** The field lives in the existing mailbox options form, which requires a
   mailbox host; without a mailbox the URL keeps its default.
+
+**Amendment 2026-11-16 — holidays from calendars: "Ferien" vs "menu not in yet" (HAS-8).** PDF delivery
+is unreliable, and a school day without a stored menu looked exactly like a day in the Ferien. This
+reverses "holidays are absence of data" (§4.3, §10 R15) for the two menu sensors only. Plan:
+`docs/plans/holiday-aware-empty-state.md`.
+
+- **Inputs** — two optional calendar entities in the options:
+  - `holiday_calendar` (e.g. `calendar.schulferien_berlin`, Remote Calendar from the calovo Berlin
+    Ferien ICS): any event covering a date makes it no-school; the label is the event summary.
+  - `workday_calendar` (e.g. the Workday integration's calendar): a **weekday** without an event is a
+    public holiday, label `Feiertag`. Weekend days are never marked from it.
+  - Both empty → behaviour identical to 0.5.0.
+- **Lookup** (`holidays.py`, the only `calendar.get_events` caller) for today … today + 14 days; the
+  two calendars are read concurrently. All-day event ends are exclusive; event spans are clamped to
+  the window before dates are built. When both calendars mark a day, the Ferien label wins. An event
+  whose dates cannot be read is skipped with a `WARNING`.
+- **Lookup failure** (missing, unavailable, raising or timing out after 10 s): that calendar keeps
+  its last known days and a retry is scheduled in 15 minutes. With no earlier result it contributes
+  nothing, so the day falls back to `no_menu` — never a false "Ferien".
+- **Cache and refresh.** The coordinator holds `no_school: dict[date, str]` (today onwards),
+  refreshed at setup, at midnight, on a time-zone change, and when either configured calendar's
+  *state* changes (attribute-only writes are ignored; calendars may load after this integration).
+  Refreshes are serialised by a lock, and triggers that arrive while one refresh is already waiting
+  are coalesced into it, so the last refresh always reads the newest calendar data. Only a changed
+  cache notifies listeners. At setup the first refresh runs before the first website check (so a
+  Ferien week is known before any request), and an error from the calendars is logged there and never
+  cancels the website check.
+- **Sensor precedence** for `today` / `next_school_day`, state always `none` without a menu:
+  1. a stored menu is shown, even on a calendar holiday (data wins);
+  2. `today` on Saturday/Sunday → `reason: weekend`;
+  3. the sensor's date is no-school → `reason: holiday`, `holiday: <label>`;
+  4. **end of Ferien:** `next_school_day` whose date is a school day, while *today* is no-school
+     (including a Ferien Saturday) **and a weekend lies between today and that date** → `reason:
+     holiday` with today's label. A weekday public holiday followed by a school day (e.g. Frauentag
+     on a Monday) therefore still shows `no_menu` for Tuesday (code review 2026-11-16);
+  5. otherwise `reason: no_menu`.
+  `next_school_day` keeps its R3 meaning (next weekday).
+- **Card texts** (operator's wording): `holiday` → `Keine Menüinformationen - Ferien`, `no_menu` →
+  `Noch keine Menüinformationen vorhanden`, `weekend` → `Kein Mittagessen` (unchanged).
+- **Website source.** No request when every weekday of the target week from today on is
+  no-school (on Sunday evening: all five; on a Tuesday: Tuesday to Friday).
+- **Options form.** Both fields sit in the existing mailbox form for now; a separate
+  "calendar & website" options step is a planned follow-up.

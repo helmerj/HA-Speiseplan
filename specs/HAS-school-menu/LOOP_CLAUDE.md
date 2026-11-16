@@ -15,7 +15,8 @@ the per-iteration journal belongs in `LOOP_STATE.md`.
 
 ## Decisions that are already settled (do not re-litigate)
 
-- No-menu sensor state is the **literal string `none`** with `reason: weekend|no_menu`.
+- No-menu sensor state is the **literal string `none`** with `reason: weekend|holiday|no_menu`
+  (`holiday` from optional Ferien/Workday calendars since HAS-8, 2026-11-16).
 - **Exactly one config entry**, fixed unique id; `services.yaml` has **no** `config_entry_id`.
 - The second menu sensor is the **next weekday** — Fri, Sat and Sun all resolve to Monday — and is
   named for it: `sensor.school_menu_next_school_day` (renamed from `_tomorrow` 2026-09-26).
@@ -27,8 +28,10 @@ the per-iteration journal belongs in `LOOP_STATE.md`.
   week → **three-layer dedup** (byte identity → content identity → genuine update) in §5.5 of the design.
 - IMAP is **read-only**: `SINCE`+`FROM` search, `BODY.PEEK[]`, `\Seen` never set.
 - Success notification on **manual imports only**; IMAP success is an INFO log plus `last_import`.
-- Staleness is surfaced by `sensor.school_menu_last_import`, never by an alarm (holidays = no data).
-- Card empty state is German: `Kein Mittagessen`.
+- Staleness is surfaced by `sensor.school_menu_last_import`, never by an alarm. Holidays come from
+  calendars (HAS-8); a failing calendar falls back to `no_menu`, never to a false holiday.
+- Card empty states are German: `Keine Menüinformationen - Ferien` (holiday), `Noch keine
+  Menüinformationen vorhanden` (no_menu), `Kein Mittagessen` (weekend).
 
 Full rationale: `docs/0002-design.md` §10 (R1–R15). If implementation needs to diverge from the design,
 **update `docs/0002-design.md` first** — that is a standing rule for this project, not a suggestion.

@@ -13,6 +13,8 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -26,6 +28,7 @@ from yarl import URL
 
 from .const import (
     CONF_FOLDER,
+    CONF_HOLIDAY_CALENDAR,
     CONF_HOST,
     CONF_NAME,
     CONF_PASSWORD,
@@ -36,6 +39,7 @@ from .const import (
     CONF_SUBJECT_FILTER,
     CONF_USERNAME,
     CONF_WEB_URL,
+    CONF_WORKDAY_CALENDAR,
     DEFAULT_FOLDER,
     DEFAULT_NAME,
     DEFAULT_PORT,
@@ -88,6 +92,14 @@ def _mailbox_schema(current: Mapping[str, Any]) -> vol.Schema:
                 )
             ),
             vol.Optional(CONF_WEB_URL, default=current.get(CONF_WEB_URL, DEFAULT_WEB_URL)): str,
+            vol.Optional(
+                CONF_HOLIDAY_CALENDAR,
+                description={"suggested_value": current.get(CONF_HOLIDAY_CALENDAR) or None},
+            ): EntitySelector(EntitySelectorConfig(domain="calendar")),
+            vol.Optional(
+                CONF_WORKDAY_CALENDAR,
+                description={"suggested_value": current.get(CONF_WORKDAY_CALENDAR) or None},
+            ): EntitySelector(EntitySelectorConfig(domain="calendar")),
         }
     )
 
@@ -102,6 +114,8 @@ def _normalise(user_input: dict[str, Any]) -> dict[str, Any]:
     cleaned[CONF_HOST] = cleaned.get(CONF_HOST, "").strip()
     cleaned[CONF_SUBJECT_FILTER] = cleaned.get(CONF_SUBJECT_FILTER, "").strip()
     cleaned[CONF_WEB_URL] = cleaned.get(CONF_WEB_URL, DEFAULT_WEB_URL).strip()
+    cleaned[CONF_HOLIDAY_CALENDAR] = cleaned.get(CONF_HOLIDAY_CALENDAR) or ""
+    cleaned[CONF_WORKDAY_CALENDAR] = cleaned.get(CONF_WORKDAY_CALENDAR) or ""
     return cleaned
 
 
@@ -176,7 +190,7 @@ class SchoolMenuOptionsFlow(OptionsFlow):
         if errors:
             return self.async_show_form(
                 step_id="init",
-                data_schema=_mailbox_schema({**self.config_entry.data, **user_input}),
+                data_schema=_mailbox_schema({**self.config_entry.data, **cleaned}),
                 errors=errors,
             )
         self.hass.config_entries.async_update_entry(

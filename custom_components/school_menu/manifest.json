@@ -1,6 +1,9 @@
 {
   "domain": "school_menu",
   "name": "School Menu",
+  "after_dependencies": [
+    "calendar"
+  ],
   "codeowners": [
     "@helmerj"
   ],
@@ -20,5 +23,5 @@
     "aioimaplib>=2.0.1"
   ],
   "single_config_entry": true,
-  "version": "0.5.0"
+  "version": "0.6.0"
 }

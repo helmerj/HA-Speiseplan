@@ -17,6 +17,10 @@ cards:
       {%- elif lines -%}
       {{ lines[0] }}
       {{ lines[1:] | join(' · ') }}
+      {%- elif state_attr(e, 'reason') == 'holiday' -%}
+      Keine Menüinformationen - Ferien
+      {%- elif state_attr(e, 'reason') == 'no_menu' -%}
+      Noch keine Menüinformationen vorhanden
       {%- else -%}
       Kein Mittagessen
       {%- endif -%}
@@ -44,7 +48,8 @@ cards:
       {%- if states(e) in ['unavailable', 'unknown'] -%}
       Speiseplan nicht verfügbar
       {%- else -%}
-      {{ lines[0] if lines else 'Kein Mittagessen' }}
+      {%- set empty = {'holiday': 'Keine Menüinformationen - Ferien', 'no_menu': 'Noch keine Menüinformationen vorhanden'} -%}
+      {{ lines[0] if lines else empty.get(state_attr(e, 'reason'), 'Kein Mittagessen') }}
       {%- if lines[1:] %}
       {{ lines[1:] | join(' · ') }}
       {%- endif %}
